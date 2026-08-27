@@ -148,9 +148,7 @@ public class Steering : MonoBehaviour
         return Mathf.Sign(_steerAngle) * wheelAngle;
     }
 
-
     //内側の切れ角から外側の切れ角を計算する
-    //2025/06/18 小見川 処理の変更を行いました。
     float CalcAckermanOutsideAngle(float _insideAngle, float _steerAngle)
     {
         //修正前の式
