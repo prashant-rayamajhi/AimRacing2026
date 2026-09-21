@@ -3,7 +3,7 @@ using Unity.VisualScripting;
 
 static public class CarPhysics
 {
-    //ƒGƒ“ƒWƒ“‚Ì“ñ‰ñ“]•ª‚ÌˆÚ“®—Ê
+    //ã‚¨ãƒ³ã‚¸ãƒ³ã®äºŒå›è»¢åˆ†ã®ç§»å‹•é‡
     public static readonly float One_Cycle = 4 * UnityEngine.Mathf.PI;
     // AngularVelocity[rad/sec] to RPM[N/min]
     public static readonly float Rad2RPM = 30f / UnityEngine.Mathf.PI;

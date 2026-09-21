@@ -26,3 +26,6 @@
 Thumbs.db
 Desktop.ini
 
+
+# Source-only portfolio repository
+*.meta
