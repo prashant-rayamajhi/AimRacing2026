@@ -51,7 +51,7 @@
 
 回転数、加速、音へ渡す燃焼状態を共通の状態から求めることで、それぞれの反応が独立して食い違わないようにしています。出力上限や回転上限はゲーム向けの調整値を含みます。
 
-主要コード：[`Engine.cs`](Assets/%23Scripts/CarScript/Engine.cs)
+主要コード：[`Engine.cs`](Assets/%23Scripts/CarScript/Powertrain/Engine.cs)
 
 ### 2. 接地・サスペンション・表示タイヤの整合
 
@@ -61,7 +61,7 @@
 
 また、旧WheelController2024と現行制御が同時に物理更新しないよう、車両初期化時に旧処理を停止します。継承開発で起こりやすい「別の場所から同じ車体へ力が加わる」問題にも対処しています。
 
-主要コード：[`WheelController2026.cs`](Assets/%23Scripts/CarScript/WheelController2026.cs)、[`VehicleController.cs`](Assets/%23Scripts/CarScript/VehicleController.cs)
+主要コード：[`WheelController2026.cs`](Assets/%23Scripts/CarScript/Wheels/WheelController2026.cs)、[`VehicleController.cs`](Assets/%23Scripts/CarScript/Vehicle/VehicleController.cs)
 
 ### 3. 変速の受付と駆動の接続を分ける
 
@@ -71,7 +71,7 @@ ATでは、停止中の「前進1速 ↔ N ↔ R」の選択と走行中の自�
 
 MTの発進補助では、回転数を直接引き上げるのではなく、目標回転へ立ち上げるためのトルクを残すようクラッチ負荷を制限します。発進時の回転上昇と駆動の接続を、同じ駆動系の計算の中で扱う設計です。
 
-主要コード：[`Transmission.cs`](Assets/%23Scripts/CarScript/Transmission.cs)、[`Clutch.cs`](Assets/%23Scripts/CarScript/Clutch.cs)、[`VehicleController.ManualLever.cs`](Assets/%23Scripts/CarScript/VehicleController.ManualLever.cs)
+主要コード：[`Transmission.cs`](Assets/%23Scripts/CarScript/Powertrain/Transmission.cs)、[`Clutch.cs`](Assets/%23Scripts/CarScript/Powertrain/Clutch.cs)、[`GearShift.cs`](Assets/%23Scripts/CarScript/Vehicle/GearShift.cs)
 
 ### 4. 操作を支えるABS・ESCと走行モード
 
@@ -81,7 +81,7 @@ MTの発進補助では、回転数を直接引き上げるのではなく、目
 
 Normal・Sport・Trackでは前後トルク配分に加えて、旋回補助や滑りの許容幅を切り替えます。モード変更は補間し、Trackではカウンターステアを曲がり不足と誤認して過剰に制動しないよう調整しています。
 
-主要コード：[`VehicleController.ESC.cs`](Assets/%23Scripts/CarScript/VehicleController.ESC.cs)、[`Differential.DriveModes.cs`](Assets/%23Scripts/CarScript/Differential.DriveModes.cs)、[`WheelController2026.PoweredGrip.cs`](Assets/%23Scripts/CarScript/WheelController2026.PoweredGrip.cs)
+主要コード：[`StabilityAssist.cs`](Assets/%23Scripts/CarScript/Vehicle/StabilityAssist.cs)、[`Differential.DriveModes.cs`](Assets/%23Scripts/CarScript/Powertrain/Differential.DriveModes.cs)、[`WheelController2026.DriveGrip.cs`](Assets/%23Scripts/CarScript/Wheels/WheelController2026.DriveGrip.cs)
 
 ### 5. 車両状態とサウンドを連携させる
 
@@ -123,7 +123,7 @@ flowchart LR
 
 駆動力と制御の関係を示した概念図です。`VehicleController`が物理更新をまとめ、機構ごとの状態や計算を各クラスへ渡します。
 
-`VehicleController`の補助処理は、`Collision`、`ESC`、`Launch`、`ManualLever`、`Handling`などのpartialファイルへ分けています。衝突、発進、変速のどの処理を変更するかを追いやすくしています。これらは同じクラスの一部で、別々のコンポーネントではありません。
+`VehicleController`の補助処理は、`WallCollision`、`StabilityAssist`、`RaceStart`、`GearShift`、`CorneringAssist`などのpartialファイルへ分けています。衝突、発進、変速のどの処理を変更するかを追いやすくしています。これらは同じクラスの一部で、別々のコンポーネントではありません。物理更新は`Drivetrain.cs`、車体のピッチ制御は`BodyMotion.cs`、コース復帰は`VehicleRecovery.cs`に分かれています。
 
 ## 特に見てほしいコード
 
@@ -131,20 +131,27 @@ flowchart LR
 
 | 順番 | ファイル | 確認してほしい処理 |
 | --- | --- | --- |
-| 1 | [VehicleController.cs](Assets/%23Scripts/CarScript/VehicleController.cs) | `FixedUpdate`での各機構の連携、`ResetAfterCourseRecovery`での状態初期化 |
-| 2 | [Engine.cs](Assets/%23Scripts/CarScript/Engine.cs) | `EngineUpdate`のトルクと慣性による積分、`EvaluateEngineTorque`の出力上限制御 |
-| 3 | [WheelController2026.cs](Assets/%23Scripts/CarScript/WheelController2026.cs) | 駆動・制動の車輪への反映、`ApplyAntiRollBar`、接地と表示タイヤの整合 |
-| 4 | [Clutch.cs](Assets/%23Scripts/CarScript/Clutch.cs) | `ApplyManualLaunchLoadLimit`で発進用トルクを残す計算 |
-| 5 | [Transmission.cs](Assets/%23Scripts/CarScript/Transmission.cs) | 自動変速と`RequestAutomaticSelector`による停止中の方向選択 |
-| 6 | [VehicleController.ESC.cs](Assets/%23Scripts/CarScript/VehicleController.ESC.cs) | `UpdateESC`、`IsESCOversteer`、`SelectESCBrakeWheel`の判断の分離 |
-| 7 | [VehicleController.Collision.cs](Assets/%23Scripts/CarScript/VehicleController.Collision.cs) | `LimitContactRebound`などの接触方向を考慮した反発抑制 |
+| 1 | [VehicleController.cs](Assets/%23Scripts/CarScript/Vehicle/VehicleController.cs) | 車両の参照・状態管理。物理更新は[Drivetrain.cs](Assets/%23Scripts/CarScript/Vehicle/Drivetrain.cs)、復帰処理は[VehicleRecovery.cs](Assets/%23Scripts/CarScript/Vehicle/VehicleRecovery.cs)へ分割 |
+| 2 | [Engine.cs](Assets/%23Scripts/CarScript/Powertrain/Engine.cs) | `EngineUpdate`のトルクと慣性による積分、`EvaluateEngineTorque`の出力上限制御 |
+| 3 | [WheelController2026.cs](Assets/%23Scripts/CarScript/Wheels/WheelController2026.cs) | 駆動・制動の車輪への反映、`ApplyAntiRollBar`、接地と表示タイヤの整合 |
+| 4 | [Clutch.cs](Assets/%23Scripts/CarScript/Powertrain/Clutch.cs) | `ApplyManualLaunchLoadLimit`で発進用トルクを残す計算 |
+| 5 | [Transmission.cs](Assets/%23Scripts/CarScript/Powertrain/Transmission.cs) | 自動変速と`RequestAutomaticSelector`による停止中の方向選択 |
+| 6 | [StabilityAssist.cs](Assets/%23Scripts/CarScript/Vehicle/StabilityAssist.cs) | `UpdateESC`、`IsESCOversteer`、`SelectESCBrakeWheel`の判断の分離 |
+| 7 | [WallCollision.cs](Assets/%23Scripts/CarScript/Vehicle/WallCollision.cs) | `LimitContactRebound`などの接触方向を考慮した反発抑制 |
 
 <details>
 <summary>リポジトリ構成を開く</summary>
 
 ```text
 Assets/#Scripts/
-├─ CarScript/       車両挙動と共通処理
+├─ CarScript/
+│  ├─ Vehicle/     車両状態・駆動更新・各種補助・復帰
+│  ├─ Powertrain/  エンジン・クラッチ・変速・駆動配分・操舵・制動
+│  ├─ Wheels/      接地・車輪制御
+│  ├─ Physics/     重心・空力・共通定数
+│  ├─ Collision/   コースの通過判定
+│  ├─ Inspector/   Inspector用の共通処理
+│  └─ Legacy/      旧実装の参照
 ├─ Input/           操作入力
 ├─ Sound/2024/      車両サウンド
 ├─ Integration/    メーター・FFB・コース復帰との連携
@@ -155,13 +162,13 @@ Assets/#Scripts/
 └─ Others/         関連修正
 ```
 
-C#スクリプト50件を収録しています。旧WheelController2024と空のFrontColliderは互換・旧実装の参照です。主な車輪制御はWheelController2026を参照してください。RacingState.csには提出用のデバッグ操作除去が含まれますが、ゲーム進行全体を担当成果とするものではありません。
+C#スクリプト52件を収録しています。旧WheelController2024と空のFrontColliderは互換・旧実装の参照です。主な車輪制御はWheelController2026を参照してください。RacingState.csには提出用のデバッグ操作除去が含まれますが、ゲーム進行全体を担当成果とするものではありません。
 
 </details>
 
 ## 検証と公開範囲
 
-2026年9月26日の更新・提出用整理では、元プロジェクトのソースと既存ライブラリを使い、整理したファイルを組み合わせてC#コンパイル診断を行いました。整理前後ともエラー0件、警告321件でした。不要なデバッグ処理の除去以外について、実行コードのトークン一致も確認しています。
+2026年9月26日の更新・提出用整理では、元プロジェクトのソースと既存ライブラリを使い、整理したファイルを組み合わせてC#コンパイル診断を行いました。整理前後ともエラー0件、警告311件でした。不要なデバッグ処理の除去以外について、実行コードのトークン一致も確認しています。
 
 この公開リポジトリ単独のビルドや、公開版での実プレイ・試聴・G923実機確認を完了したという意味ではありません。
 

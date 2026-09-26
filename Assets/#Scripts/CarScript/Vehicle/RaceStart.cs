@@ -129,4 +129,96 @@ public partial class VehicleController
 
         m_launchRPMBlendRemaining = Mathf.Max(0f, m_launchRPMBlendRemaining - Time.fixedDeltaTime);
     }
+
+    // 車両の固定状態を変更する
+    public void PullUp(bool _active)
+    {
+        // Rigidbodyを取得する
+        if (m_rigidbody == null)
+            TryGetComponent(out m_rigidbody);
+        if (m_rigidbody == null)
+        {
+            AppLog.LogError("VehicleController: Rigidbodyがないため車両の固定状態を変更できません。", this);
+            return;
+        }
+
+        // 車両の固定状態を変更する
+        RigidbodyConstraints constraints;
+        if (_active)
+        {
+            // イントロからレースへ同じ固定状態を再指定しても開始済みカウントの回転引き継ぎを消さない
+            if (!m_isPullUp)
+            {
+                m_countdownLaunchActive = false;
+                m_launchRPMBlendRemaining = 0f;
+            }
+
+            constraints = RigidbodyConstraints.FreezePositionX | RigidbodyConstraints.FreezePositionY | RigidbodyConstraints.FreezePositionZ;
+            m_rigidbody.linearVelocity = Vector3.zero;
+            m_rigidbody.angularVelocity = Vector3.zero;
+            ResetBodyPitchState();
+            m_wheelController.ResetDynamics();
+            m_smoothedDriveInput = 0f;
+        }
+        else
+        {
+            constraints = RigidbodyConstraints.None;
+            // カウント中の実回転数を発進へ引き継いでから車体固定を解除する
+            ReleaseCountdownLaunch();
+            // ATのカウントダウン終了時にNから1速へ切り替えてクリープと発進を有効にする
+            if (m_mission.Type == Transmission.TransmissionType.Automatic && m_mission.ActiveGear == 0)
+            {
+                m_mission.PrepareForwardStart();
+            }
+
+            if (m_meterUIManager != null)
+            {
+                m_meterUIManager.StartTimer();
+            }
+        }
+
+        // 車両の固定状態を更新する
+        m_isPullUp = _active;
+        m_mission.IsPullUp = _active;
+        m_clutch.IsPullUp = _active;
+        m_rigidbody.constraints = constraints;
+        Physics.SyncTransforms();
+        m_clutch.Oscillation = 1.0f;
+    }
+
+    // イントロ中に車両の前後左右と姿勢を固定しながらサスペンションを路面へ馴染ませる関数
+    public void PrepareIntroGrounding()
+    {
+        PullUp(true);
+        if (m_rigidbody == null)
+        {
+            return;
+        }
+
+        // 接地情報が安定するまで車体を完全固定し、開始直後の落下とタイヤの跳ねを防ぐ
+        m_introGroundingFramesRemaining = m_introGroundingFixedFrames;
+        m_rigidbody.constraints = RigidbodyConstraints.FreezePosition | RigidbodyConstraints.FreezeRotation;
+        m_rigidbody.WakeUp();
+    }
+
+    // イントロ開始直後の数フレームだけ路面食い込みを補正してから上下サスペンションを解放する関数
+    void UpdateIntroGrounding()
+    {
+        if (m_introGroundingFramesRemaining <= 0 || m_rigidbody == null)
+        {
+            return;
+        }
+
+        m_wheelController.CorrectGroundPenetrationImmediately();
+        m_introGroundingFramesRemaining--;
+        if (m_introGroundingFramesRemaining > 0)
+        {
+            return;
+        }
+
+        m_rigidbody.linearVelocity = Vector3.zero;
+        m_rigidbody.angularVelocity = Vector3.zero;
+        m_rigidbody.constraints = RigidbodyConstraints.FreezePositionX | RigidbodyConstraints.FreezePositionZ | RigidbodyConstraints.FreezeRotation;
+        Physics.SyncTransforms();
+    }
 }

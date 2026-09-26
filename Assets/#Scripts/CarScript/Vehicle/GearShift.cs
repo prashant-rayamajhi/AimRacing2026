@@ -296,4 +296,29 @@ public partial class VehicleController
         float disengaged = Mathf.Clamp(m_leverClutchDisengageThreshold, 0.5f, 1f);
         m_clutch.ClutchInput = m_clutchPedalReceived ? 1f - Mathf.InverseLerp(released, disengaged, m_physicalClutchPedal) : 0f;
     }
+
+    // トランスミッションの種類を切り替える
+    public void ChangeMissionType()
+    {
+        if (m_mission.Type == Transmission.TransmissionType.Manual)
+        {
+            m_mission.Type = Transmission.TransmissionType.Automatic;
+        }
+        else if (m_mission.Type == Transmission.TransmissionType.Automatic)
+        {
+            m_mission.Type = Transmission.TransmissionType.Manual;
+        }
+    }
+
+    // パドル操作でATとクラッチ付き自動MTモードを切り替える関数
+    public void SetPaddleTransmissionType(Transmission.TransmissionType _transmissionType)
+    {
+        SelectPaddleClutch();
+        m_mission.Type = _transmissionType;
+        m_clutch.AutoClutch = true;
+        if (_transmissionType == Transmission.TransmissionType.Automatic && !m_isPullUp && m_mission.ActiveGear == 0)
+        {
+            m_mission.PrepareForwardStart();
+        }
+    }
 }
