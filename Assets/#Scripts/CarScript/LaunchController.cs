@@ -51,9 +51,9 @@ public class LaunchController : MonoBehaviour
                 m_meter.FlashingRPM = m_flashingRPM;
         }
 
-        foreach (TireSound Wheel in m_tiresound)
+        foreach (TireSound wheel in m_tiresound)
         {
-            if (Wheel == null)
+            if (wheel == null)
             {
                 continue;
             }

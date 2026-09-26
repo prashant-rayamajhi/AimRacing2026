@@ -8,13 +8,15 @@ public class WindSound : MonoBehaviour
     [SerializeField]
     VehicleController m_vehicle;
     // 既存の風切り音イベント
+    [UnityEngine.Serialization.FormerlySerializedAs("m_eventRef_Wind")]
     [SerializeField]
-    EventReference m_eventRef_Wind;
+    EventReference m_eventRefWind;
     // 再生中の風音を更新して終了時に解放する参照
     FMOD.Studio.EventInstance m_windEvent;
     // 既存Inspectorの風音量を維持する設定
+    [UnityEngine.Serialization.FormerlySerializedAs("WindVolume")]
     [SerializeField, Range(0.0f, 1.0f)]
-    float WindVolume = 1.0f;
+    float m_windVolume = 1.0f;
     // 高速時に風切り音を補強する最大音量差
     [SerializeField, Range(0f, 6f)]
     float m_highSpeedGainDb = 3f;
@@ -31,14 +33,14 @@ public class WindSound : MonoBehaviour
     // 初期音量を消してから既存の風音イベントを再生する関数
     void Start()
     {
-        if (m_vehicle == null || m_eventRef_Wind.IsNull)
+        if (m_vehicle == null || m_eventRefWind.IsNull)
         {
             Debug.LogWarning("[WindSound] 車両またはWindイベントが未設定です。", this);
             enabled = false;
             return;
         }
 
-        m_windEvent = RuntimeManager.CreateInstance(m_eventRef_Wind);
+        m_windEvent = RuntimeManager.CreateInstance(m_eventRefWind);
         if (!m_windEvent.isValid())
         {
             Debug.LogWarning("[WindSound] Windイベントを生成できません。バンクとイベント参照を確認してください。", this);
@@ -70,7 +72,7 @@ public class WindSound : MonoBehaviour
         float speed = Mathf.Abs(m_vehicle.KPH);
         // 高速時の補強量をデシベルからイベント音量へ変換する
         float gain = Mathf.Lerp(0f, m_highSpeedGainDb, Mathf.Clamp01(speed / Mathf.Max(1f, m_fullWindSpeedKph)));
-        float target = m_vehicle.IsPullUp ? 0f : Mathf.Clamp01(WindVolume) * Mathf.Pow(10f, gain / 20f);
+        float target = m_vehicle.IsPullUp ? 0f : Mathf.Clamp01(m_windVolume) * Mathf.Pow(10f, gain / 20f);
         // フレームレートによらず指定時間で音量を追従させる
         float response = 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.01f, m_volumeResponseSeconds));
         m_currentVolume = Mathf.Lerp(m_currentVolume, target, response);
@@ -80,15 +82,15 @@ public class WindSound : MonoBehaviour
     }
 
     // 再生接続の不具合を一度だけ報告する関数
-    void ReportSoundError(FMOD.RESULT result)
+    void ReportSoundError(FMOD.RESULT _result)
     {
-        if (result == FMOD.RESULT.OK || m_reportedSoundError)
+        if (_result == FMOD.RESULT.OK || m_reportedSoundError)
         {
             return;
         }
 
         m_reportedSoundError = true;
-        Debug.LogWarning($"[WindSound] 風音の再生または設定に失敗しました: {result}", this);
+        Debug.LogWarning($"[WindSound] 風音の再生または設定に失敗しました: {_result}", this);
     }
 
     // 無効化中に風音だけが鳴り続けないよう停止する関数

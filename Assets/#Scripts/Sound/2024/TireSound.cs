@@ -64,14 +64,14 @@ public class TireSound : MonoBehaviour
     public float SentVolumeParameter { get; private set; }
 
     // 振幅比をデシベルへ換算し既存バンクの音量カーブへ対応させる関数
-    float CalculateVolumeParameter(float amplitude)
+    float CalculateVolumeParameter(float _amplitude)
     {
-        if (amplitude <= 0.0001f)
+        if (_amplitude <= 0.0001f)
         {
             return 0f;
         }
 
-        float decibels = m_bankFullDecibels + 20f * Mathf.Log10(Mathf.Clamp01(amplitude));
+        float decibels = m_bankFullDecibels + 20f * Mathf.Log10(Mathf.Clamp01(_amplitude));
         return Mathf.InverseLerp(m_bankSilentDecibels, m_bankFullDecibels, decibels);
     }
 

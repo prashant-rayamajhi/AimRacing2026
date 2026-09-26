@@ -5,14 +5,18 @@ using UnityEngine;
 public class MagicFormula
 {
     // 係数
+    [UnityEngine.Serialization.FormerlySerializedAs("B_stiffness")]
     [SerializeField]
-    float B_stiffness = 10f; // 剛性係数
+    float m_bStiffness = 10f; // 剛性係数
+    [UnityEngine.Serialization.FormerlySerializedAs("C_shape")]
     [SerializeField]
-    float C_shape = 1.9f; // 形状係数
+    float m_cShape = 1.9f; // 形状係数
+    [UnityEngine.Serialization.FormerlySerializedAs("D_peak")]
     [SerializeField]
-    float D_peak = 1f; // ピーク値
+    float m_dPeak = 1f; // ピーク値
+    [UnityEngine.Serialization.FormerlySerializedAs("E_curvature")]
     [SerializeField]
-    float E_curvature = 1f; // 曲率係数
+    float m_eCurvature = 1f; // 曲率係数
     const int m_peakSlipResolution = 1000; // ピークスリップ値を計算する解像度
     [SerializeField, ShowInInspector]
     float m_peakSlipRatio;
@@ -21,10 +25,10 @@ public class MagicFormula
 #region プロパティ
     public float PeakSlipRatio => m_peakSlipRatio;
     public float PeakSlipAngle => m_peakSlipAngle;
-    public float B_val { get => B_stiffness; }
-    public float C_val { get => C_shape; }
-    public float D_val { get => D_peak; }
-    public float E_val { get => E_curvature; }
+    public float B_val { get => m_bStiffness; }
+    public float C_val { get => m_cShape; }
+    public float D_val { get => m_dPeak; }
+    public float E_val { get => m_eCurvature; }
 
 #endregion
     public void Initialize()
@@ -35,12 +39,12 @@ public class MagicFormula
 
     public float Evaluate(in float _slip)
     {
-        var B = B_stiffness;
-        var C = C_shape;
-        var D = D_peak;
-        var E = E_curvature;
+        var b = m_bStiffness;
+        var c = m_cShape;
+        var d = m_dPeak;
+        var e = m_eCurvature;
         var x = _slip;
-        return D * Mathf.Sin(C * Mathf.Atan(B * x - E * (B * x - Mathf.Atan(B * x))));
+        return d * Mathf.Sin(c * Mathf.Atan(b * x - e * (b * x - Mathf.Atan(b * x))));
     }
 
     void CalcPeakSlipRatio()

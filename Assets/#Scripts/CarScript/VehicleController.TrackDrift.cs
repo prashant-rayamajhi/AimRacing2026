@@ -41,17 +41,17 @@ public partial class VehicleController
     [SerializeField, Range(0.02f, 0.35f)]
     float m_trackManualCoastReleaseSeconds = 0.08f;
     // 踏み直し時だけ惰性制動の解除を速め全開後の残留制動をなくす関数
-    static float ReleaseManualCoastTorque(float previous, float target, float throttle, float responseSeconds, float deltaTime)
+    static float ReleaseManualCoastTorque(float _previous, float _target, float _throttle, float _responseSeconds, float _deltaTime)
     {
         // 全開ではエンジン側の摩擦を残し追加の惰性制動だけを終了する
-        if (throttle >= 1f && target <= 0f)
+        if (_throttle >= 1f && _target <= 0f)
         {
             return 0f;
         }
 
         // 物理更新間隔が変わっても同じ時間で減速トルクを解放する
-        float response = 1f - Mathf.Exp(-Mathf.Max(0f, deltaTime) / Mathf.Max(0.01f, responseSeconds));
-        return Mathf.Lerp(previous, target, response);
+        float response = 1f - Mathf.Exp(-Mathf.Max(0f, _deltaTime) / Mathf.Max(0.01f, _responseSeconds));
+        return Mathf.Lerp(_previous, _target, response);
     }
 
     // 現在ペダル操作に合わせて滑らかに変更した滑り許容角
@@ -98,63 +98,63 @@ public partial class VehicleController
     }
 
     // 滑りが増えているときに補い収まり始めたら介入を引く復帰量を求める関数
-    static float CalculateTrackRecovery(float slipDegrees, float rateDegrees, float allowance, float followSeconds, float damping)
+    static float CalculateTrackRecovery(float _slipDegrees, float _rateDegrees, float _allowance, float _followSeconds, float _damping)
     {
         // 許容幅の内側では横滑りを強制せずタイヤとプレイヤーの操作に任せる
-        float excess = Mathf.Abs(slipDegrees) - allowance;
+        float excess = Mathf.Abs(_slipDegrees) - _allowance;
         if (excess <= 0f)
         {
             return 0f;
         }
 
         // 横滑り角の比例項と角速度の減衰項を同じ角加速度の単位で合成する
-        float seconds = Mathf.Max(0.2f, followSeconds);
-        float outwardRate = Mathf.Sign(slipDegrees) * rateDegrees * Mathf.Deg2Rad;
-        float recovery = excess * Mathf.Deg2Rad / (seconds * seconds) + 2f * Mathf.Max(0f, damping) * outwardRate / seconds;
-        return Mathf.Sign(slipDegrees) * Mathf.Max(0f, recovery);
+        float seconds = Mathf.Max(0.2f, _followSeconds);
+        float outwardRate = Mathf.Sign(_slipDegrees) * _rateDegrees * Mathf.Deg2Rad;
+        float recovery = excess * Mathf.Deg2Rad / (seconds * seconds) + 2f * Mathf.Max(0f, _damping) * outwardRate / seconds;
+        return Mathf.Sign(_slipDegrees) * Mathf.Max(0f, recovery);
     }
 
     // 滑りが拡大する予測量を使い限界に近づくほどESCの緩和を解除する関数
-    static float CalculateTrackPoweredESCScale(float slip, float rate, float allowance, float fullSlip, float prediction, float minimum)
+    static float CalculateTrackPoweredESCScale(float _slip, float _rate, float _allowance, float _fullSlip, float _prediction, float _minimum)
     {
         // 回復中の角速度は危険の増加として扱わず拡大している分だけ先読みする
-        float outwardRate = Mathf.Max(0f, Mathf.Sign(slip) * rate);
-        float predictedSlip = Mathf.Abs(slip) + outwardRate * Mathf.Max(0f, prediction);
-        float danger = Mathf.InverseLerp(allowance, Mathf.Max(allowance + 1f, fullSlip), predictedSlip);
-        return Mathf.Lerp(Mathf.Clamp01(minimum), 1f, danger);
+        float outwardRate = Mathf.Max(0f, Mathf.Sign(_slip) * _rate);
+        float predictedSlip = Mathf.Abs(_slip) + outwardRate * Mathf.Max(0f, _prediction);
+        float danger = Mathf.InverseLerp(_allowance, Mathf.Max(_allowance + 1f, _fullSlip), predictedSlip);
+        return Mathf.Lerp(Mathf.Clamp01(_minimum), 1f, danger);
     }
 
     // 切り返し前の復帰力を残さず必要な補助だけ滑らかに増やす関数
-    static float LimitTrackRecovery(float previous, float requested, float rate, float deltaTime)
+    static float LimitTrackRecovery(float _previous, float _requested, float _rate, float _deltaTime)
     {
         // 回復済みなら補助を解除し逆向きへ滑ったら古い補助を持ち越さない
-        if (requested == 0f)
+        if (_requested == 0f)
         {
             return 0f;
         }
 
-        if (previous * requested < 0f)
+        if (_previous * _requested < 0f)
         {
-            previous = 0f;
+            _previous = 0f;
         }
 
         // 収束中の要求より強い補助を残さず介入の立ち上がりだけを制限する
-        float limited = Mathf.MoveTowards(previous, requested, Mathf.Max(0f, rate) * Mathf.Max(0f, deltaTime));
-        return Mathf.Sign(requested) * Mathf.Min(Mathf.Abs(limited), Mathf.Abs(requested));
+        float limited = Mathf.MoveTowards(_previous, _requested, Mathf.Max(0f, _rate) * Mathf.Max(0f, _deltaTime));
+        return Mathf.Sign(_requested) * Mathf.Min(Mathf.Abs(limited), Mathf.Abs(_requested));
     }
 
     // 滑りを戻すカウンター操作だけESCの定常旋回との比較を緩める関数
-    static float CalculateTrackCountersteerWeight(float slip, float yaw, float desiredYaw, float allowance, float fullSlip)
+    static float CalculateTrackCountersteerWeight(float _slip, float _yaw, float _desiredYaw, float _allowance, float _fullSlip)
     {
         // 旋回開始や同方向への切り増しや速度方向と逆の異常旋回は通常ESCを維持する
-        if (yaw * desiredYaw >= 0f || yaw * slip >= 0f)
+        if (_yaw * _desiredYaw >= 0f || _yaw * _slip >= 0f)
         {
             return 0f;
         }
 
         // 小さな角度では通常ESCを残し限界角では保護を全量復帰する
-        float drift = Mathf.InverseLerp(2f, Mathf.Max(3f, allowance), Mathf.Abs(slip));
-        float severe = Mathf.InverseLerp(allowance, Mathf.Max(allowance + 1f, fullSlip), Mathf.Abs(slip));
+        float drift = Mathf.InverseLerp(2f, Mathf.Max(3f, _allowance), Mathf.Abs(_slip));
+        float severe = Mathf.InverseLerp(_allowance, Mathf.Max(_allowance + 1f, _fullSlip), Mathf.Abs(_slip));
         return drift * (1f - severe);
     }
 }

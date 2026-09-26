@@ -30,21 +30,21 @@ public class Brake : MonoBehaviour
     [SerializeField, Min(0.1f)]
     float m_handbrakeReleaseRate = 10f;
     // 通常ブレーキの前後配分に使うペダル入力
-    float m_BreakeInput;
+    float m_breakeInput;
     // 後輪制動の立ち上がりと解除を滑らかにする補間済み入力
     float m_handbrakeAmount;
     // 通常ブレーキ用のペダル入力を受け渡すプロパティ
-    public float BrakeInput { get => m_BreakeInput; set => m_BreakeInput = Mathf.Clamp01(value); }
+    public float BrakeInput { get => m_breakeInput; set => m_breakeInput = Mathf.Clamp01(value); }
     // 制動中にクリープや発進補助が車体を押さないよう通知するプロパティ
     public bool HandbrakeActive => m_onHandBrake || m_handbrakeAmount > 0f;
     // 操作確認用に補間済みのサイドブレーキ入力を返すプロパティ
     public float HandbrakeAmount => m_handbrakeAmount;
 
     // 走行可能な間だけHキーを読み取り後輪制動を更新する関数
-    public void UpdateHandbrake(bool canDrive)
+    public void UpdateHandbrake(bool _canDrive)
     {
         // イントロや非アクティブ画面では押下状態を持ち越さない
-        if (!canDrive || !isActiveAndEnabled || !Application.isFocused || Time.timeScale <= 0f)
+        if (!_canDrive || !isActiveAndEnabled || !Application.isFocused || Time.timeScale <= 0f)
         {
             ResetHandbrake();
             return;
@@ -66,24 +66,24 @@ public class Brake : MonoBehaviour
     }
 
     // 後輪制動の開始と解除を時間刻みに依存しない速さで補間する関数
-    void AdvanceHandbrake(bool pressed, float deltaTime)
+    void AdvanceHandbrake(bool _pressed, float _deltaTime)
     {
-        m_onHandBrake = pressed;
+        m_onHandBrake = _pressed;
         // 押下中はゆっくり制動を増やし、解除は素早く戻す
-        float rate = pressed ? m_handbrakeApplyRate : m_handbrakeReleaseRate;
-        m_handbrakeAmount = Mathf.MoveTowards(m_handbrakeAmount, pressed ? 1f : 0f, Mathf.Max(0f, rate * deltaTime));
+        float rate = _pressed ? m_handbrakeApplyRate : m_handbrakeReleaseRate;
+        m_handbrakeAmount = Mathf.MoveTowards(m_handbrakeAmount, _pressed ? 1f : 0f, Mathf.Max(0f, rate * _deltaTime));
     }
 
     // 前輪制動を消さず通常ペダルの前後配分を返す関数
-    public float GetBrakeTorque(bool isFront)
+    public float GetBrakeTorque(bool _isFront)
     {
-        return m_maxBrakeTorque * m_BreakeInput * (isFront ? m_frontBrakeBias : 1f - m_frontBrakeBias);
+        return m_maxBrakeTorque * m_breakeInput * (_isFront ? m_frontBrakeBias : 1f - m_frontBrakeBias);
     }
 
     // 後輪だけへサイドブレーキの制動トルクを返す関数
-    public float GetHandbrakeTorque(bool isFront)
+    public float GetHandbrakeTorque(bool _isFront)
     {
-        return isFront ? 0f : Mathf.Max(0f, m_handbrakeTorquePerWheel) * m_handbrakeAmount;
+        return _isFront ? 0f : Mathf.Max(0f, m_handbrakeTorquePerWheel) * m_handbrakeAmount;
     }
 
     // 復帰や操作停止時にサイドブレーキの制動を解除する関数
@@ -100,9 +100,9 @@ public class Brake : MonoBehaviour
     }
 
     // 別画面へ移った際にキーを離した通知が届かなくても解除する関数
-    void OnApplicationFocus(bool focused)
+    void OnApplicationFocus(bool _focused)
     {
-        if (!focused)
+        if (!_focused)
         {
             ResetHandbrake();
         }

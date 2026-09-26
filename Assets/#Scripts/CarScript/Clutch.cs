@@ -7,11 +7,15 @@ public class Clutch : MonoBehaviour
     [SerializeField]
     bool m_clutchAuto = true;
     // 現在のクラッチが伝達できる最大トルク
+    [UnityEngine.Serialization.FormerlySerializedAs("m_calclateClutchMaxTorque")]
+    [UnityEngine.Serialization.FormerlySerializedAs("m_Calclate_ClutchMaxTorque")]
     [SerializeField, ShowInInspector]
-    float m_Calclate_ClutchMaxTorque;
+    float m_torqueCapacity;
     // クラッチ板を押し付ける圧着力
+    [UnityEngine.Serialization.FormerlySerializedAs("m_crimpingForce")]
+    [UnityEngine.Serialization.FormerlySerializedAs("m_CrimpingForce")]
     [SerializeField, ShowInInspector]
-    float m_CrimpingForce;
+    float m_clampForce;
     // AT発進時に半クラッチから完全接続へ移る回転数範囲
     [SerializeField]
     Vector2 m_lockRange = new Vector2(900f, 1400f);
@@ -22,23 +26,28 @@ public class Clutch : MonoBehaviour
     [SerializeField, Range(0.5f, 30f)]
     float m_autoReleaseRate = 15f;
     // AT変速中も速度を途切れさせないために残すクラッチ接続率
+    [UnityEngine.Serialization.FormerlySerializedAs("m_automaticShiftMinimumEngagement")]
     [SerializeField, Range(0.2f, 0.9f)]
-    float m_automaticShiftMinimumEngagement = 0.55f;
+    float m_autoShiftMinEngagement = 0.55f;
     // 最大エンジントルクに耐えるクラッチ設計トルク
+    [UnityEngine.Serialization.FormerlySerializedAs("m_DesignTorque")]
     [SerializeField]
-    float m_DesignTorque = 700f;
+    float m_designTorque = 700f;
     // クラッチ板の摩擦力を求める摩擦係数
     [SerializeField]
     float m_frictionCoef = 0.55f;
     // クラッチ板の有効半径を求める外径
+    [UnityEngine.Serialization.FormerlySerializedAs("m_ClutchOD")]
     [SerializeField]
-    float m_ClutchOD = 0.35f;
+    float m_clutchOD = 0.35f;
     // クラッチ板の有効半径を求める内径
+    [UnityEngine.Serialization.FormerlySerializedAs("m_ClutchID")]
     [SerializeField]
-    float m_ClutchID = 0.25f;
+    float m_clutchID = 0.25f;
     // クラッチの伝達容量を求める摩擦面数
+    [UnityEngine.Serialization.FormerlySerializedAs("m_ClutchSurface")]
     [SerializeField]
-    float m_ClutchSurface = 4f;
+    float m_clutchSurface = 4f;
     // 変速中にクラッチを切るための状態
     [SerializeField, ShowInInspector]
     bool m_isGearChanging;
@@ -46,8 +55,9 @@ public class Clutch : MonoBehaviour
     [SerializeField, ShowInInspector]
     bool m_isPullUp;
     // 変速機へ渡す現在のクラッチトルク
+    [UnityEngine.Serialization.FormerlySerializedAs("m_OutputTorque")]
     [SerializeField, ShowInInspector]
-    float m_OutputTorque;
+    float m_outputTorque;
     // 半クラッチの伝達トルクを求める入出力回転差
     [SerializeField, ShowInInspector]
     float m_clutchSlip;
@@ -67,19 +77,23 @@ public class Clutch : MonoBehaviour
     [SerializeField, ShowInInspector]
     float m_clutchLock;
     // クラッチ接続変化による振動量
+    [UnityEngine.Serialization.FormerlySerializedAs("m_clutchInput_diff")]
     [SerializeField, ShowInInspector]
-    float m_clutchInput_diff;
+    float m_clutchInputDiff;
     // クラッチ接続変化を求める前回値
-    float m_clutchInput_prev;
+    float m_clutchInputPrev;
     // 旧振動処理の振幅割合
+    [UnityEngine.Serialization.FormerlySerializedAs("m_AmplitudeRatio")]
     [SerializeField]
-    float m_AmplitudeRatio;
+    float m_amplitudeRatio;
     // 旧振動処理を収束させる減衰割合
+    [UnityEngine.Serialization.FormerlySerializedAs("m_DampingRatio")]
     [SerializeField]
-    float m_DampingRatio;
+    float m_dampingRatio;
     // 旧振動処理の振動速度
+    [UnityEngine.Serialization.FormerlySerializedAs("m_AmplitudeSpeed")]
     [SerializeField]
-    float m_AmplitudeSpeed;
+    float m_amplitudeSpeed;
     // 現在ギアのクラッチ接続条件を判断するギア比
     float m_gearRatio;
     // 旧振動処理の開始時刻
@@ -102,19 +116,19 @@ public class Clutch : MonoBehaviour
     [SerializeField, Range(0.1f, 0.5f)]
     float m_manualLaunchResponseSeconds = 0.2f;
     // 車両側が許可したMT1速の発進目標角速度
-    float m_manualLaunchTargetAngularVelocity;
+    float m_launchAngularSpeed;
     // 発進時の滑りをRPM直接同期で打ち消さないための状態
     public bool ManualLaunchSlipActive { get; private set; }
 
     // MT1速でブレーキを離して加速する時だけ発進補助を準備する関数
-    public void ConfigureManualLaunch(bool allowed, float throttle, float idleAngularVelocity)
+    public void ConfigureManualLaunch(bool _allowed, float _throttle, float _idleAngularVelocity)
     {
-        float target = Mathf.Max(idleAngularVelocity, m_manualLaunchRPM * CarPhysics.RPM2Rad);
-        m_manualLaunchTargetAngularVelocity = allowed && m_manualLaunchAssist && throttle > 0f ? Mathf.Lerp(idleAngularVelocity, target, Mathf.Clamp01(throttle)) : 0f;
+        float target = Mathf.Max(_idleAngularVelocity, m_manualLaunchRPM * CarPhysics.m_rpmToRadians);
+        m_launchAngularSpeed = _allowed && m_manualLaunchAssist && _throttle > 0f ? Mathf.Lerp(_idleAngularVelocity, target, Mathf.Clamp01(_throttle)) : 0f;
     }
 
     // 現在のクラッチ伝達トルク
-    public float ClutchTorque => m_OutputTorque;
+    public float ClutchTorque => m_outputTorque;
     // 現在のクラッチ接続率
     public float Engagement => m_clutchInput;
     // イントロ中の車体固定状態
@@ -133,22 +147,22 @@ public class Clutch : MonoBehaviour
             // 切断時に前回のトルクが次のギアへ一物理更新だけ漏れることを防ぐ
             if (m_clutchInput <= 0f)
             {
-                m_OutputTorque = 0f;
+                m_outputTorque = 0f;
             }
         }
     }
 
     // 旧振動演出へ渡す振動量
-    public float Oscillation { set => m_clutchInput_diff = value; }
+    public float Oscillation { set => m_clutchInputDiff = value; }
 
     // エンジン側と車輪側の状態からクラッチトルクを更新する関数
-    public void DrivetrainUpdate(in float clutchOutputSide, in float engineAngularVelocity, in float engineOutputTorque, in float gearRatio, in float engineInertia)
+    public void DrivetrainUpdate(in float _clutchOutputSide, in float _engineAngularVelocity, in float _engineOutputTorque, in float _gearRatio, in float _engineInertia)
     {
-        m_clutchAngularVelocity = clutchOutputSide;
-        m_engineAngularVelocity = engineAngularVelocity;
-        m_engineTorque = engineOutputTorque;
-        m_gearRatio = gearRatio;
-        m_engineInertia = Mathf.Max(0.001f, engineInertia);
+        m_clutchAngularVelocity = _clutchOutputSide;
+        m_engineAngularVelocity = _engineAngularVelocity;
+        m_engineTorque = _engineOutputTorque;
+        m_gearRatio = _gearRatio;
+        m_engineInertia = Mathf.Max(0.001f, _engineInertia);
         m_clutchSlip = m_engineAngularVelocity - m_clutchAngularVelocity;
         CalcClutchTorque();
     }
@@ -156,17 +170,17 @@ public class Clutch : MonoBehaviour
     // 復帰前の回転差や伝達トルクを消去する関数
     public void ResetDynamics()
     {
-        m_manualLaunchTargetAngularVelocity = 0f;
+        m_launchAngularSpeed = 0f;
         ManualLaunchSlipActive = false;
-        m_OutputTorque = 0f;
+        m_outputTorque = 0f;
         m_clutchSlip = 0f;
         m_clutchAngularVelocity = 0f;
         m_engineAngularVelocity = 0f;
         m_engineTorque = 0f;
         m_clutchInput = m_clutchAuto ? 0f : m_clutchInput;
         m_clutchLock = m_clutchInput;
-        m_clutchInput_diff = 0f;
-        m_clutchInput_prev = m_clutchInput;
+        m_clutchInputDiff = 0f;
+        m_clutchInputPrev = m_clutchInput;
     }
 
     // クラッチの摩擦容量と回転差から伝達トルクを計算する関数
@@ -182,7 +196,7 @@ public class Clutch : MonoBehaviour
                 m_clutchInput = 0f;
             }
 
-            m_OutputTorque = 0f;
+            m_outputTorque = 0f;
             return;
         }
 
@@ -191,47 +205,47 @@ public class Clutch : MonoBehaviour
             UpdateAutomaticClutch();
         }
 
-        float effectiveRadius = (m_ClutchOD + m_ClutchID) / 4f;
-        float diskForceRatio = m_frictionCoef * effectiveRadius * m_ClutchSurface;
-        m_CrimpingForce = m_DesignTorque / Mathf.Max(0.001f, diskForceRatio) * m_clutchInput;
-        m_Calclate_ClutchMaxTorque = diskForceRatio * m_CrimpingForce;
+        float effectiveRadius = (m_clutchOD + m_clutchID) / 4f;
+        float diskForceRatio = m_frictionCoef * effectiveRadius * m_clutchSurface;
+        m_clampForce = m_designTorque / Mathf.Max(0.001f, diskForceRatio) * m_clutchInput;
+        m_torqueCapacity = diskForceRatio * m_clampForce;
         if (PhysicalManualCoupling)
         {
             // Nと全踏みでは駆動を切り回転合わせにアクセルだけを使えるようにする
             if (m_clutchInput <= 0f || m_gearRatio == 0f)
             {
-                m_OutputTorque = 0f;
+                m_outputTorque = 0f;
                 return;
             }
 
             float responseSeconds = Mathf.Max(Time.fixedDeltaTime, m_manualCouplingSeconds);
             float requested = (m_engineTorque + m_clutchSlip * m_engineInertia / responseSeconds) * m_clutchInput;
-            m_OutputTorque = Mathf.Clamp(requested, -m_Calclate_ClutchMaxTorque, m_Calclate_ClutchMaxTorque);
+            m_outputTorque = Mathf.Clamp(requested, -m_torqueCapacity, m_torqueCapacity);
             ApplyManualLaunchLoadLimit();
             return;
         }
 
         if (m_clutchInput <= 0f || m_engineTorque <= 0f)
         {
-            m_OutputTorque = 0f;
+            m_outputTorque = 0f;
             return;
         }
 
         float couplingTorque = m_clutchSlip * 0.8f * m_clutchInput;
         float requestedTorque = m_engineTorque * m_clutchInput + couplingTorque;
-        m_OutputTorque = Mathf.Clamp(requestedTorque, -m_Calclate_ClutchMaxTorque, m_Calclate_ClutchMaxTorque);
+        m_outputTorque = Mathf.Clamp(requestedTorque, -m_torqueCapacity, m_torqueCapacity);
         ApplyManualLaunchLoadLimit();
     }
 
     // 車輪が発進回転に追いつくまでエンジンを加速させる余力を残す関数
     void ApplyManualLaunchLoadLimit()
     {
-        if (m_manualLaunchTargetAngularVelocity <= 0f || m_clutchInput <= 0f || m_gearRatio <= 0f)
+        if (m_launchAngularSpeed <= 0f || m_clutchInput <= 0f || m_gearRatio <= 0f)
         {
             return;
         }
 
-        if (Mathf.Abs(m_clutchAngularVelocity) >= m_manualLaunchTargetAngularVelocity)
+        if (Mathf.Abs(m_clutchAngularVelocity) >= m_launchAngularSpeed)
         {
             return;
         }
@@ -239,11 +253,11 @@ public class Clutch : MonoBehaviour
         ManualLaunchSlipActive = true;
         // 必要なエンジン加速トルクを差し引き回転数を直接書き換えず発進時だけ負荷を減らす
         float response = Mathf.Max(Time.fixedDeltaTime, m_manualLaunchResponseSeconds);
-        float reserveTorque = m_engineInertia * (m_manualLaunchTargetAngularVelocity - m_engineAngularVelocity) / response;
+        float reserveTorque = m_engineInertia * (m_launchAngularSpeed - m_engineAngularVelocity) / response;
         float allowedTorque = Mathf.Max(0f, m_engineTorque - reserveTorque);
-        if (m_OutputTorque > 0f)
+        if (m_outputTorque > 0f)
         {
-            m_OutputTorque = Mathf.Min(m_OutputTorque, allowedTorque);
+            m_outputTorque = Mathf.Min(m_outputTorque, allowedTorque);
         }
     }
 
@@ -258,11 +272,11 @@ public class Clutch : MonoBehaviour
             return;
         }
 
-        float engineRPM = Mathf.Abs(m_engineAngularVelocity) * CarPhysics.Rad2RPM;
-        float drivetrainRPM = Mathf.Abs(m_clutchAngularVelocity) * CarPhysics.Rad2RPM;
+        float engineRPM = Mathf.Abs(m_engineAngularVelocity) * CarPhysics.m_radiansToRpm;
+        float drivetrainRPM = Mathf.Abs(m_clutchAngularVelocity) * CarPhysics.m_radiansToRpm;
         float couplingRPM = Mathf.Max(engineRPM, drivetrainRPM);
         float runningEngagement = Mathf.InverseLerp(m_lockRange.x, Mathf.Max(m_lockRange.x + 1f, m_lockRange.y), couplingRPM);
-        float targetEngagement = m_isGearChanging ? Mathf.Min(runningEngagement, m_automaticShiftMinimumEngagement) : runningEngagement;
+        float targetEngagement = m_isGearChanging ? Mathf.Min(runningEngagement, m_autoShiftMinEngagement) : runningEngagement;
         float responseRate = targetEngagement > m_clutchInput ? m_autoEngagementRate : m_autoReleaseRate;
         m_clutchInput = Mathf.MoveTowards(m_clutchInput, targetEngagement, responseRate * Time.fixedDeltaTime);
         m_clutchLock = m_clutchInput;

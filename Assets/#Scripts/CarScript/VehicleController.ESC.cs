@@ -29,7 +29,7 @@ public partial class VehicleController
         float actualYawRate = Vector3.Dot(m_rigidbody.angularVelocity, transform.up);
         float yawError = actualYawRate - m_escDesiredYawRate;
         // ESCの介入条件を判定する
-        if (!m_escEnabled || m_IsPullUp || GroundedWheelCount < 3 || actualSpeedKph < m_escMinimumSpeedKph || Mathf.Abs(forwardSpeed) < 1f)
+        if (!m_escEnabled || m_isPullUp || GroundedWheelCount < 3 || actualSpeedKph < m_escMinimumSpeedKph || Mathf.Abs(forwardSpeed) < 1f)
         {
             m_escIntervention = 0f;
             m_escBrakeWheelIndex = -1;
@@ -73,25 +73,25 @@ public partial class VehicleController
     }
 
     // 旋回開始時のゼロ回転を除外し実際の逆旋回または回りすぎだけを判定する関数
-    static bool IsESCOversteer(float actualYawRate, float desiredYawRate, float yawThreshold)
+    static bool IsESCOversteer(float _actualYawRate, float _desiredYawRate, float _yawThreshold)
     {
         // 微小な符号の揺れで前輪と後輪の制動先が切り替わらないよう同じ判定幅を使う
-        bool oppositeYaw = actualYawRate * desiredYawRate < 0f && Mathf.Abs(actualYawRate) > yawThreshold;
-        return oppositeYaw || Mathf.Abs(actualYawRate) > Mathf.Abs(desiredYawRate) + yawThreshold;
+        bool oppositeYaw = _actualYawRate * _desiredYawRate < 0f && Mathf.Abs(_actualYawRate) > _yawThreshold;
+        return oppositeYaw || Mathf.Abs(_actualYawRate) > Mathf.Abs(_desiredYawRate) + _yawThreshold;
     }
 
     // 旋回誤差を打ち消す側の車輪を進行方向に合わせて選ぶ関数
-    static int SelectESCBrakeWheel(float yawError, bool oversteer, float forwardSpeed, float yawThreshold)
+    static int SelectESCBrakeWheel(float _yawError, bool _oversteer, float _forwardSpeed, float _yawThreshold)
     {
         // 微小な誤差で左右のブレーキが切り替わらないよう判定幅を設ける
-        if (Mathf.Abs(yawError) <= yawThreshold || Mathf.Abs(forwardSpeed) < 1f)
+        if (Mathf.Abs(_yawError) <= _yawThreshold || Mathf.Abs(_forwardSpeed) < 1f)
         {
             return -1;
         }
 
         // 後退中は制動力の向きが反転するため、補正する車輪の左右も反転する
-        bool brakeRightSide = yawError * forwardSpeed < 0f;
-        return oversteer ? (brakeRightSide ? 0 : 1) : (brakeRightSide ? 2 : 3);
+        bool brakeRightSide = _yawError * _forwardSpeed < 0f;
+        return _oversteer ? (brakeRightSide ? 0 : 1) : (brakeRightSide ? 2 : 3);
     }
 
     // アクセル開度と姿勢の崩れ方から車体へ実際に適用するESC介入率を計算する関数
@@ -112,12 +112,12 @@ public partial class VehicleController
     }
 
     // ペダル開度で通常旋回の補助を補間し、大きく滑った時は制動を最大まで許可する関数
-    static float CalculateESCApplication(float intervention, float throttle, float poweredScale, float coastScale)
+    static float CalculateESCApplication(float _intervention, float _throttle, float _poweredScale, float _coastScale)
     {
         // 外部設定が範囲外でも制動率が負値や最大値超過にならないよう制限する
-        float demand = Mathf.Clamp01(intervention);
+        float demand = Mathf.Clamp01(_intervention);
         // 惰性と加速の補助を同じ倍率にすればペダル操作だけでは制動率が変わらない
-        float normalScale = Mathf.Lerp(Mathf.Clamp01(coastScale), Mathf.Clamp01(poweredScale), Mathf.Clamp01(throttle));
+        float normalScale = Mathf.Lerp(Mathf.Clamp01(_coastScale), Mathf.Clamp01(_poweredScale), Mathf.Clamp01(_throttle));
         // 限界付近では減速の弱さより姿勢回復を優先するため通常旋回の倍率を解除する
         float severeInstabilityRatio = Mathf.InverseLerp(0.65f, 1f, demand);
         return demand * Mathf.Lerp(normalScale, 1f, severeInstabilityRatio);
@@ -126,13 +126,13 @@ public partial class VehicleController
     // 速度と舵角から子供でも扱いやすいコーナー用トルク倍率を計算する関数
     float GetCornerAssistTorqueRatio()
     {
-        if (!m_cornerAssistEnabled || m_IsPullUp || m_mission.CurrentGearRatio <= 0f || m_brakeInput > 0.01f)
+        if (!m_cornerAssistEnabled || m_isPullUp || m_mission.CurrentGearRatio <= 0f || m_brakeInput > 0.01f)
         {
             m_cornerAssistIntervention = Mathf.MoveTowards(m_cornerAssistIntervention, 0f, m_cornerAssistReleaseRate * Time.fixedDeltaTime);
             return 1f;
         }
 
-        float speedRatio = Mathf.InverseLerp(m_cornerAssistStartSpeedKph, m_cornerAssistFullSpeedKph, m_KPH);
+        float speedRatio = Mathf.InverseLerp(m_cornerAssistStartSpeedKph, m_cornerAssistFullSpeedKph, m_kph);
         float steerRatio = Mathf.InverseLerp(m_cornerAssistStartSteerAngle, m_cornerAssistFullSteerAngle, Mathf.Abs(m_steering.CurrentCenterAngle));
         // 実際の横滑りが小さい時は速度を奪わず、大きく滑り始めた時だけ補助を強める
         float fullSlipThreshold = m_escSlipAngleThreshold * m_escFullSlipMultiplier;

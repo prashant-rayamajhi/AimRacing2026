@@ -10,8 +10,9 @@ public class StabilityControl : MonoBehaviour
     WheelController2024 m_fr;
     [SerializeField, ShowInInspector]
     float m_yawRate;
+    [UnityEngine.Serialization.FormerlySerializedAs("desireYaw")]
     [SerializeField, ShowInInspector]
-    float desireYaw;
+    float m_desireYaw;
     [SerializeField, ShowInInspector]
     float m_a;
     [SerializeField, ShowInInspector]
@@ -28,12 +29,12 @@ public class StabilityControl : MonoBehaviour
     {
         m_yawRate = m_vehicle.Rigidbody.angularVelocity.y;
         float v = m_vehicle.Rigidbody.linearVelocity.magnitude;
-        desireYaw = v * m_fl.SteerAngle * Mathf.Deg2Rad;
-        desireYaw /= 2.75f + (1120f * v * v * 0.983f / (2f * 30000f * 2.75f));
-        m_a = desireYaw / 8;
-        float Mbf = 1.58f / 2f * (m_fr.LongForce - m_fl.LongForce);
-        float dFxf = 2 * Mbf / 1.58f;
-        m_aleft = desireYaw - m_yawRate;
+        m_desireYaw = v * m_fl.SteerAngle * Mathf.Deg2Rad;
+        m_desireYaw /= 2.75f + (1120f * v * v * 0.983f / (2f * 30000f * 2.75f));
+        m_a = m_desireYaw / 8;
+        float mbf = 1.58f / 2f * (m_fr.LongForce - m_fl.LongForce);
+        float dFxf = 2 * mbf / 1.58f;
+        m_aleft = m_desireYaw - m_yawRate;
         m_fronts.x = 0.5f * dFxf * m_fl.Radius;
         m_fronts.y = 0.5f * dFxf * m_fr.Radius;
     }

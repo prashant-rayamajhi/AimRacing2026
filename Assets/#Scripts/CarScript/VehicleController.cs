@@ -8,8 +8,9 @@ public partial class VehicleController : MonoBehaviour
     [Space]
     [SerializeField]
     WheelController2026 m_wheelController;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_KPH")]
     [SerializeField, ShowInInspector]
-    float m_KPH;
+    float m_kph;
     [Space]
     [SerializeField]
     Car_Engine m_engine;
@@ -42,11 +43,12 @@ public partial class VehicleController : MonoBehaviour
     float m_recoveryRequestedAt;
     [SerializeField, ShowInInspector]
     float m_lastRecoveryResponseSeconds;
-    bool m_IsPullUp = false;
+    bool m_isPullUp = false;
     [SerializeField, Range(1, 10)]
     int m_introGroundingFixedFrames = 4;
     int m_introGroundingFramesRemaining;
-    public float m_HornInput = 0f;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_HornInput")]
+    public float m_hornInput = 0f;
     [SerializeField]
     MeterUIManager m_meterUIManager;
     // ATの低速クリープ制御
@@ -67,8 +69,9 @@ public partial class VehicleController : MonoBehaviour
     float m_launchAssistTorque = 180f;
     [SerializeField, Range(1f, 20f)]
     float m_launchAssistMaximumSpeedKph = 8f;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_arcadeAccelerationTorqueMultiplier")]
     [SerializeField, Range(1f, 8f)]
-    float m_arcadeAccelerationTorqueMultiplier = 2.75f;
+    float m_accelTorqueBoost = 2.75f;
     [SerializeField, Range(80f, 160f)]
     float m_arcadeAccelerationFadeEndKph = 120f;
     [SerializeField, Range(1f, 20f)]
@@ -103,7 +106,7 @@ public partial class VehicleController : MonoBehaviour
     float m_coastMaximumDeceleration = 2.2f;
     // 駆動軸へ段差なく渡すエンジンブレーキトルク
     float m_appliedCoastTorque;
-    // GR Yarisの最高速制限
+    // 車両の最高速制限
     [Header("Speed Limiter")]
     [SerializeField, Min(1f)]
     float m_atMaximumSpeedKph = 230f;
@@ -233,7 +236,7 @@ public partial class VehicleController : MonoBehaviour
     public Transmission Transmission => m_mission;
     public Car_Engine Engine => m_engine;
     public WheelController2026 WheelComtroller => m_wheelController;
-    public float KPH => Mathf.Clamp(m_KPH, 0f, float.PositiveInfinity);
+    public float KPH => Mathf.Clamp(m_kph, 0f, float.PositiveInfinity);
     public float EngineRPM => m_engine.RPM;
     public bool ESCActive => m_escActive;
     // 検証画面へESCの介入率を渡すプロパティ
@@ -268,12 +271,12 @@ public partial class VehicleController : MonoBehaviour
     }
 
     // 入力機器に応じて操舵補間を切り替える関数
-    public void SetSteeringInput(float value, bool smoothInput)
+    public void SetSteeringInput(float _value, bool _smoothInput)
     {
-        m_steerInput = Mathf.Clamp(value, -1f, 1f);
+        m_steerInput = Mathf.Clamp(_value, -1f, 1f);
         if (m_steering != null)
         {
-            m_steering.SmoothInput = smoothInput;
+            m_steering.SmoothInput = _smoothInput;
         }
     }
 
@@ -285,9 +288,9 @@ public partial class VehicleController : MonoBehaviour
     public float Clutch { get => m_clutchInput; // 直接入力するデバッグ処理からもMTのクラッチペダルを無効にする
         set => m_clutchInput = value; }
     // 車両の固定状態のプロパティ
-    public bool IsPullUp { get => m_IsPullUp; }
+    public bool IsPullUp { get => m_isPullUp; }
     // ホーン入力のプロパティ
-    public float IsHorn { get => m_HornInput; set => m_HornInput = value; }
+    public float IsHorn { get => m_hornInput; set => m_hornInput = value; }
     // 駆動系の参照を外部から取得するためのプロパティ
     public Car_Engine passEngine => m_engine;
     public Clutch passClutch => m_clutch;
@@ -417,10 +420,10 @@ public partial class VehicleController : MonoBehaviour
         // Trackの実クラッチを自動復帰や駆動計算より先に反映する
         UpdateManualLeverClutch();
         // サイドブレーキ入力を先に読み取り、発進補助との競合を防ぐ
-        m_brake.UpdateHandbrake(!m_IsPullUp);
+        m_brake.UpdateHandbrake(!m_isPullUp);
         // 衝突後の速度補正で相対速度を誤用しないよう物理更新直前の車体速度を保存する
-        m_velocityBeforePhysicsStep = m_rigidbody.linearVelocity;
-        m_hasVelocityBeforePhysicsStep = true;
+        m_preStepVelocity = m_rigidbody.linearVelocity;
+        m_hasPreStepVelocity = true;
         float driveInputRate = m_accelInput > m_smoothedDriveInput ? m_driveInputRiseRate : m_driveInputFallRate;
         m_smoothedDriveInput = Mathf.MoveTowards(m_smoothedDriveInput, m_accelInput, driveInputRate * Time.fixedDeltaTime);
         // 復帰後の実際の発進を計測し、駆動系の初期化で再発進を準備する
@@ -431,7 +434,7 @@ public partial class VehicleController : MonoBehaviour
         }
 
         // 完全停止してブレーキを離した瞬間に、制動中の負スリップを次の発進へ持ち越さない。
-        if (!ManualLeverActive && m_previousBrakeInput > 0.01f && m_brakeInput <= 0.01f && m_KPH < 0.5f)
+        if (!ManualLeverActive && m_previousBrakeInput > 0.01f && m_brakeInput <= 0.01f && m_kph < 0.5f)
         {
             PrepareStationaryRestart();
         }
@@ -439,7 +442,7 @@ public partial class VehicleController : MonoBehaviour
         // ギア切り替え
         // 実タイヤ半径と現在のレブ上限を渡し設定変更後も安全な変速判定を行う
         m_mission.ConfigureShiftSafety(m_wheelController.WheelRadius, m_engine.OverRevRPM);
-        m_mission.TransmissionUpdate(m_engine.RPM, m_KPH, m_accelInput);
+        m_mission.TransmissionUpdate(m_engine.RPM, m_kph, m_accelInput);
         // MTの高回転ダウンシフト後に選択段の最高速度まで車体を減速する
         ApplyManualDownshiftSpeedLimit();
         m_differential.SetFinalDriveRatio(m_mission.FinalDriveRatio);
@@ -453,18 +456,18 @@ public partial class VehicleController : MonoBehaviour
 
         // 実クラッチの接続量に合わせ通常MTと同じ発進補助を戻す
         float clutchAssistRatio = ManualDriveAssistRatio;
-        if (clutchAssistRatio > 0f && !m_IsPullUp && m_brakeInput <= 0.01f && m_accelInput > 0.03f && m_mission.CurrentGearRatio != 0f && m_KPH < m_launchAssistMaximumSpeedKph)
+        if (clutchAssistRatio > 0f && !m_isPullUp && m_brakeInput <= 0.01f && m_accelInput > 0.03f && m_mission.CurrentGearRatio != 0f && m_kph < m_launchAssistMaximumSpeedKph)
         {
-            float launchRatio = 1f - Mathf.Clamp01(m_KPH / m_launchAssistMaximumSpeedKph);
+            float launchRatio = 1f - Mathf.Clamp01(m_kph / m_launchAssistMaximumSpeedKph);
             float launchTorque = m_launchAssistTorque * m_smoothedDriveInput * launchRatio * clutchAssistRatio;
             driveTorque = Mathf.Sign(m_mission.CurrentGearRatio) * Mathf.Max(Mathf.Abs(driveTorque), launchTorque);
         }
 
         // 0km/hから100km/hまでの加速をゲーム向けに強化する
-        if (clutchAssistRatio > 0f && !m_IsPullUp && m_brakeInput <= 0.01f && m_accelInput > 0.03f && m_mission.CurrentGearRatio > 0f)
+        if (clutchAssistRatio > 0f && !m_isPullUp && m_brakeInput <= 0.01f && m_accelInput > 0.03f && m_mission.CurrentGearRatio > 0f)
         {
-            float accelerationFade = Mathf.InverseLerp(80f, m_arcadeAccelerationFadeEndKph, m_KPH);
-            float accelerationMultiplier = Mathf.Lerp(1f, m_arcadeAccelerationTorqueMultiplier, m_smoothedDriveInput);
+            float accelerationFade = Mathf.InverseLerp(80f, m_arcadeAccelerationFadeEndKph, m_kph);
+            float accelerationMultiplier = Mathf.Lerp(1f, m_accelTorqueBoost, m_smoothedDriveInput);
             // 踏み戻した時だけ通常MTと同じ倍率へ戻し半クラッチ中は補助を弱める
             driveTorque *= Mathf.Lerp(1f, Mathf.Lerp(accelerationMultiplier, 1f, accelerationFade), clutchAssistRatio);
         }
@@ -472,7 +475,7 @@ public partial class VehicleController : MonoBehaviour
         // MTの高い段では低回転の駆動不足を発進補助や加速倍率で打ち消さない
         driveTorque *= m_mission.LowRPMDriveRatio;
         // ATの1速でクリープトルクをアクセル駆動へ滑らかに受け渡す処理
-        bool canApplyCreep = m_mission.Type == Transmission.TransmissionType.Automatic && m_mission.ActiveGear == 1 && !m_IsPullUp && m_brakeInput <= 0.01f && !m_brake.HandbrakeActive;
+        bool canApplyCreep = m_mission.Type == Transmission.TransmissionType.Automatic && m_mission.ActiveGear == 1 && !m_isPullUp && m_brakeInput <= 0.01f && !m_brake.HandbrakeActive;
         m_atCreepActive = false;
         m_atCreepDriveTorque = 0f;
         if (canApplyCreep)
@@ -513,7 +516,7 @@ public partial class VehicleController : MonoBehaviour
         // プロペラシャフトの速度を計算
         float shaftVelocity = 0f;
         // ギアの入力側の値を計算する
-        float ClutchInputSide = shaftVelocity * m_mission.CurrentGearRatio;
+        float clutchInputSide = shaftVelocity * m_mission.CurrentGearRatio;
         // 後輪制動中はエンジン側から駆動輪を押さず、解除後に通常駆動へ戻す
         if (m_brake.HandbrakeActive)
         {
@@ -545,12 +548,12 @@ public partial class VehicleController : MonoBehaviour
 
         PreventRoadFallThrough();
         shaftVelocity = m_wheelController.ShaftAngularVelocity;
-        ClutchInputSide = shaftVelocity * m_mission.CurrentGearRatio;
+        clutchInputSide = shaftVelocity * m_mission.CurrentGearRatio;
         // ニュートラルだったとき
         if (m_mission.CurrentGearRatio == 0f)
         {
             // クラッチの出力
-            ClutchInputSide = m_engine.RPM * CarPhysics.RPM2Rad;
+            clutchInputSide = m_engine.RPM * CarPhysics.m_rpmToRadians;
         }
 
         // MTだけ手動クラッチ入力を渡し、ATクラッチの自動接続率を毎フレーム上書きしない
@@ -563,31 +566,31 @@ public partial class VehicleController : MonoBehaviour
         m_clutch.GearChanging = m_mission.IsGearChanging;
         // クラッチトルクの更新
         // 待機中や制動中には発進補助を使わずMT1速の踏み出しだけを助ける
-        bool manualLaunchAllowed = m_mission.Type == Transmission.TransmissionType.Manual && m_mission.ActiveGear == 1 && !m_IsPullUp && m_brakeInput <= 0.01f && !m_brake.HandbrakeActive && !m_mission.IsGearChanging;
+        bool manualLaunchAllowed = m_mission.Type == Transmission.TransmissionType.Manual && m_mission.ActiveGear == 1 && !m_isPullUp && m_brakeInput <= 0.01f && !m_brake.HandbrakeActive && !m_mission.IsGearChanging;
         m_clutch.ConfigureManualLaunch(manualLaunchAllowed, m_accelInput, m_engine.IdleAngularVelocity);
-        m_clutch.DrivetrainUpdate(ClutchInputSide, m_engine.AngularVelocity, m_engine.EngineTorque, m_mission.CurrentGearRatio, m_engine.Inertia);
+        m_clutch.DrivetrainUpdate(clutchInputSide, m_engine.AngularVelocity, m_engine.EngineTorque, m_mission.CurrentGearRatio, m_engine.Inertia);
         // エンジンの回転数の更新
-        bool atForwardSpeedLimiter = m_mission.Type == Transmission.TransmissionType.Automatic && m_mission.ActiveGear > 0 && m_KPH >= m_atMaximumSpeedKph;
+        bool atForwardSpeedLimiter = m_mission.Type == Transmission.TransmissionType.Automatic && m_mission.ActiveGear > 0 && m_kph >= m_atMaximumSpeedKph;
         // MTのアップ時だけ駆動を抜きダウン時の回転合わせを燃料カットで妨げない
         bool manualShiftInjectionCut = m_mission.Type == Transmission.TransmissionType.Manual && m_mission.IsGearChanging && m_mission.IsShiftUp && !ManualLeverActive;
         m_engine.InjectionCut = manualShiftInjectionCut || atForwardSpeedLimiter || m_reverseLimiterActive;
         // 待機中も実際の燃料カットで回転制限し発進後は通常上限へ戻す
-        m_engine.TemporaryRevLimitRPM = m_IsPullUp ? CountdownMaximumRPM : 0f;
+        m_engine.TemporaryRevLimitRPM = m_isPullUp ? CountdownMaximumRPM : 0f;
         // ATダウンシフト時だけ新しいギアの駆動軸回転へアクセルを補って合わせる
         // 自動クラッチ付きMTも前進段のダウン時は車輪側に回転を合わせる
         bool manualBlip = m_mission.Type == Transmission.TransmissionType.Manual && m_clutch.AutoClutch && m_mission.IsGearChanging && m_mission.IsShiftDown && m_mission.ActiveGear > 0;
-        bool automaticBlip = (m_mission.AutomaticBlipActive || manualBlip) && !m_IsPullUp;
-        float blipRPM = automaticBlip ? Mathf.Abs(ClutchInputSide) * CarPhysics.Rad2RPM : 0f;
+        bool automaticBlip = (m_mission.AutomaticBlipActive || manualBlip) && !m_isPullUp;
+        float blipRPM = automaticBlip ? Mathf.Abs(clutchInputSide) * CarPhysics.m_radiansToRpm : 0f;
         m_engine.EngineUpdate(m_accelInput, m_clutch.ClutchTorque, blipRPM);
         // クラッチ接続率に合わせて駆動軸回転をエンジンへ段差なく同期する処理
         // 変速中も残っているクラッチ接続分だけ回転を合わせ空ぶかしや急落を抑える
         // 実クラッチでは回転差トルクで合わせるため回転数の直接同期を重ねない
         bool canSynchronizeShift = !ManualLeverActive && !m_clutch.ManualLaunchSlipActive && (!m_mission.IsGearChanging || m_clutch.AutoClutch);
-        float drivetrainCoupling = m_mission.CurrentGearRatio != 0f && canSynchronizeShift && !m_IsPullUp ? m_clutch.Engagement : 0f;
-        m_engine.SynchronizeToDrivetrain(ClutchInputSide, drivetrainCoupling);
+        float drivetrainCoupling = m_mission.CurrentGearRatio != 0f && canSynchronizeShift && !m_isPullUp ? m_clutch.Engagement : 0f;
+        m_engine.SynchronizeToDrivetrain(clutchInputSide, drivetrainCoupling);
         // カウント中と発進直後だけ専用の回転範囲を適用する
         // 実クラッチ操作中は発進演出で回転合わせを上書きしない
-        if (ManualLeverActive && !m_IsPullUp)
+        if (ManualLeverActive && !m_isPullUp)
         {
             m_launchRPMBlendRemaining = 0f;
         }
@@ -597,7 +600,7 @@ public partial class VehicleController : MonoBehaviour
         }
 
         // 車速の計算
-        m_KPH = m_rigidbody.linearVelocity.magnitude * 3600f / 1000f;
+        m_kph = m_rigidbody.linearVelocity.magnitude * 3600f / 1000f;
         // 車体のピッチフィールを計算
         ApplyBodyPitchFeel();
         // 坂道などで実際に後退している場合へ影響しないよう、1 km/h未満だけを補正する。
@@ -619,7 +622,7 @@ public partial class VehicleController : MonoBehaviour
             return 0f;
         }
 
-        if (m_IsPullUp || m_brakeInput > 0.01f || m_mission.CurrentGearRatio == 0f || m_clutch.Engagement <= 0f)
+        if (m_isPullUp || m_brakeInput > 0.01f || m_mission.CurrentGearRatio == 0f || m_clutch.Engagement <= 0f)
         {
             m_appliedCoastTorque = 0f;
             return 0f;
@@ -719,7 +722,7 @@ public partial class VehicleController : MonoBehaviour
     void ApplyBodyPitchFeel()
     {
         // 空中と開始待機中は演出用トルクを加えず、着地時へ古い加速度を持ち越さない
-        if (m_IsPullUp || GroundedWheelCount < 2)
+        if (m_isPullUp || GroundedWheelCount < 2)
         {
             ResetBodyPitchState();
             return;
@@ -767,9 +770,9 @@ public partial class VehicleController : MonoBehaviour
     }
 
     // 世界座標で求めた加速度のうち車体の前後方向だけを取り出す関数
-    static float CalculatePitchAcceleration(Vector3 velocity, Vector3 previousVelocity, Vector3 forward, float deltaTime)
+    static float CalculatePitchAcceleration(Vector3 _velocity, Vector3 _previousVelocity, Vector3 _forward, float _deltaTime)
     {
-        return Vector3.Dot(velocity - previousVelocity, forward) / Mathf.Max(deltaTime, 0.001f);
+        return Vector3.Dot(_velocity - _previousVelocity, _forward) / Mathf.Max(_deltaTime, 0.001f);
     }
 
     // 発進や復帰直前の速度を基準にして古い加速度を持ち越さない関数
@@ -790,22 +793,22 @@ public partial class VehicleController : MonoBehaviour
         }
 
         // ATが停止中にNへ残った場合はアクセル入力で1速へ戻して発進を可能にする
-        if (!m_IsPullUp && m_mission.Type == Transmission.TransmissionType.Automatic && m_mission.ActiveGear == 0 && !m_mission.AutomaticNeutralSelected && m_accelInput > 0.03f && m_brakeInput <= 0.01f)
+        if (!m_isPullUp && m_mission.Type == Transmission.TransmissionType.Automatic && m_mission.ActiveGear == 0 && !m_mission.AutomaticNeutralSelected && m_accelInput > 0.03f && m_brakeInput <= 0.01f)
         {
             m_mission.PrepareForwardStart();
         }
 
         // 停止状態からの発進準備を行う条件を判定する
-        bool canDrive = !m_IsPullUp && m_mission.ActiveGear != 0 && m_accelInput > 0.03f && m_brakeInput <= 0.01f;
+        bool canDrive = !m_isPullUp && m_mission.ActiveGear != 0 && m_accelInput > 0.03f && m_brakeInput <= 0.01f;
         // 一度走り出した後は再び監視を有効にする。
-        if (!canDrive || m_KPH > 1f)
+        if (!canDrive || m_kph > 1f)
         {
             m_driveAwayPrepared = false;
             return;
         }
 
         // 発進準備が完了している場合は、再度準備を行わない。
-        if (m_driveAwayPrepared || m_KPH > 0.5f)
+        if (m_driveAwayPrepared || m_kph > 0.5f)
         {
             return;
         }
@@ -861,7 +864,7 @@ public partial class VehicleController : MonoBehaviour
     void PreventLowSpeedWrongDirection()
     {
         // ギアがニュートラルか、車速が1 km/h以上の場合は処理しない
-        if (m_mission.ActiveGear == 0 || m_KPH >= 1f)
+        if (m_mission.ActiveGear == 0 || m_kph >= 1f)
         {
             return;
         }
@@ -877,7 +880,7 @@ public partial class VehicleController : MonoBehaviour
 
         // 横方向と上下方向の動きは残し、ギアと反対向きの微小な前後速度だけを除去する。
         m_rigidbody.linearVelocity -= transform.forward * forwardSpeed;
-        m_KPH = m_rigidbody.linearVelocity.magnitude * 3.6f;
+        m_kph = m_rigidbody.linearVelocity.magnitude * 3.6f;
     }
 
     // コース復帰時に車体と駆動系の運動状態をまとめて初期化する。
@@ -902,7 +905,7 @@ public partial class VehicleController : MonoBehaviour
         m_rigidbody.linearVelocity = Vector3.zero;
         m_rigidbody.angularVelocity = Vector3.zero;
         ResetBodyPitchState();
-        m_KPH = 0f;
+        m_kph = 0f;
         m_previousBrakeInput = m_brakeInput;
         m_wheelController.ResetDynamics();
         // 駆動系の状態を初期化する
@@ -947,12 +950,12 @@ public partial class VehicleController : MonoBehaviour
     }
 
     // パドル操作でATとクラッチ付き自動MTモードを切り替える関数
-    public void SetPaddleTransmissionType(Transmission.TransmissionType transmissionType)
+    public void SetPaddleTransmissionType(Transmission.TransmissionType _transmissionType)
     {
         SelectPaddleClutch();
-        m_mission.Type = transmissionType;
+        m_mission.Type = _transmissionType;
         m_clutch.AutoClutch = true;
-        if (transmissionType == Transmission.TransmissionType.Automatic && !m_IsPullUp && m_mission.ActiveGear == 0)
+        if (_transmissionType == Transmission.TransmissionType.Automatic && !m_isPullUp && m_mission.ActiveGear == 0)
         {
             m_mission.PrepareForwardStart();
         }
@@ -975,7 +978,7 @@ public partial class VehicleController : MonoBehaviour
         if (_active)
         {
             // イントロからレースへ同じ固定状態を再指定しても開始済みカウントの回転引き継ぎを消さない
-            if (!m_IsPullUp)
+            if (!m_isPullUp)
             {
                 m_countdownLaunchActive = false;
                 m_launchRPMBlendRemaining = 0f;
@@ -1006,7 +1009,7 @@ public partial class VehicleController : MonoBehaviour
         }
 
         // 車両の固定状態を更新する
-        m_IsPullUp = _active;
+        m_isPullUp = _active;
         m_mission.IsPullUp = _active;
         m_clutch.IsPullUp = _active;
         m_rigidbody.constraints = constraints;

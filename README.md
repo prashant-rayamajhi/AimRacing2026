@@ -44,7 +44,7 @@
 
 アクセル入力をそのまま一定の駆動力へ変換せず、回転数に応じたトルク、過給の立ち上がり、エンジン抵抗、クラッチから戻る負荷を組み合わせています。
 
-- `EvaluateGRYarisTorque`で回転数に応じた全負荷トルクを計算し、最大トルクと最大出力の両方で制限します。
+- `EvaluateEngineTorque`で回転数に応じた全負荷トルクを計算し、最大トルクと最大出力の両方で制限します。
 - 過給の立ち上がりと抜けに異なる追従速度を使い、急なトルク変化を抑えます。
 - 正味トルクを慣性で割って角加速度を求め、物理更新ごとに回転数へ反映します。
 - レブリミッターは燃料カット開始と復帰の回転数に差を設け、上限付近で判定が細かく往復することを防ぎます。
@@ -81,7 +81,7 @@ MTの発進補助では、回転数を直接引き上げるのではなく、目
 
 Normal・Sport・Trackでは前後トルク配分に加えて、旋回補助や滑りの許容幅を切り替えます。モード変更は補間し、Trackではカウンターステアを曲がり不足と誤認して過剰に制動しないよう調整しています。
 
-主要コード：[`VehicleController.ESC.cs`](Assets/%23Scripts/CarScript/VehicleController.ESC.cs)、[`Differential.GRFour.cs`](Assets/%23Scripts/CarScript/Differential.GRFour.cs)、[`WheelController2026.PoweredGrip.cs`](Assets/%23Scripts/CarScript/WheelController2026.PoweredGrip.cs)
+主要コード：[`VehicleController.ESC.cs`](Assets/%23Scripts/CarScript/VehicleController.ESC.cs)、[`Differential.DriveModes.cs`](Assets/%23Scripts/CarScript/Differential.DriveModes.cs)、[`WheelController2026.PoweredGrip.cs`](Assets/%23Scripts/CarScript/WheelController2026.PoweredGrip.cs)
 
 ### 5. 車両状態とサウンドを連携させる
 
@@ -132,7 +132,7 @@ flowchart LR
 | 順番 | ファイル | 確認してほしい処理 |
 | --- | --- | --- |
 | 1 | [VehicleController.cs](Assets/%23Scripts/CarScript/VehicleController.cs) | `FixedUpdate`での各機構の連携、`ResetAfterCourseRecovery`での状態初期化 |
-| 2 | [Engine.cs](Assets/%23Scripts/CarScript/Engine.cs) | `EngineUpdate`のトルクと慣性による積分、`EvaluateGRYarisTorque`の出力上限制御 |
+| 2 | [Engine.cs](Assets/%23Scripts/CarScript/Engine.cs) | `EngineUpdate`のトルクと慣性による積分、`EvaluateEngineTorque`の出力上限制御 |
 | 3 | [WheelController2026.cs](Assets/%23Scripts/CarScript/WheelController2026.cs) | 駆動・制動の車輪への反映、`ApplyAntiRollBar`、接地と表示タイヤの整合 |
 | 4 | [Clutch.cs](Assets/%23Scripts/CarScript/Clutch.cs) | `ApplyManualLaunchLoadLimit`で発進用トルクを残す計算 |
 | 5 | [Transmission.cs](Assets/%23Scripts/CarScript/Transmission.cs) | 自動変速と`RequestAutomaticSelector`による停止中の方向選択 |
@@ -161,7 +161,7 @@ C#スクリプト50件を収録しています。旧WheelController2024と空の
 
 ## 検証と公開範囲
 
-2026年9月21日の提出用整理では、元プロジェクトのソースと既存ライブラリを使い、整理したファイルを組み合わせてC#コンパイル診断を行いました。整理前後ともエラー0件、警告321件でした。不要なデバッグ処理の除去以外について、実行コードのトークン一致も確認しています。
+2026年9月26日の更新・提出用整理では、元プロジェクトのソースと既存ライブラリを使い、整理したファイルを組み合わせてC#コンパイル診断を行いました。整理前後ともエラー0件、警告321件でした。不要なデバッグ処理の除去以外について、実行コードのトークン一致も確認しています。
 
 この公開リポジトリ単独のビルドや、公開版での実プレイ・試聴・G923実機確認を完了したという意味ではありません。
 

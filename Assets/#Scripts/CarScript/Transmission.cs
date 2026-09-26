@@ -22,7 +22,7 @@ public class Transmission : MonoBehaviour
     [SerializeField]
     List<float> m_gearRatioList = new List<float>();
     // 既存シーンのMT設定を残しつつ、AT選択時だけ公式8速比へ切り替える。
-    static readonly float[] GRDatGearRatios =
+    static readonly float[] m_automaticGearRatios =
     {
         0f,
         4.435f,
@@ -35,7 +35,7 @@ public class Transmission : MonoBehaviour
         0.650f
     };
     // 設定されたゲーム用6速比率を未設定車両にも使用する
-    static readonly float[] GRMtGearRatios =
+    static readonly float[] m_manualGearRatios =
     {
         0f,
         2.800f,
@@ -79,7 +79,7 @@ public class Transmission : MonoBehaviour
     [SerializeField, Min(0.01f)]
     float m_gearingReferenceWheelRadius = 0.334f;
     // WheelCollider上で1速の到達速度が公称計算値より少し低くなるため、ゲーム用に早めの変速点へ補正する。
-    static readonly float[] GRDatShiftUpSpeedKph =
+    static readonly float[] m_automaticShiftUpSpeedKph =
     {
         0f,
         50f,
@@ -92,7 +92,7 @@ public class Transmission : MonoBehaviour
         float.PositiveInfinity
     };
     // そのギアで走行を維持できる最低RPM
-    static readonly float[] GRMinimumDriveRPM =
+    static readonly float[] m_minimumDriveRpm =
     {
         0f,
         0f,
@@ -112,10 +112,10 @@ public class Transmission : MonoBehaviour
     [SerializeField, Min(1f)]
     float m_lowRPMRecoveryBand = 750f;
     // 低回転で加速が鈍る状態を作り速度や回転数を強制的にゼロへ戻さない
-    public float LowRPMDriveRatio => m_type != TransmissionType.Manual || m_currentGear < 3 ? 1f : Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(GRMinimumDriveRPM[Mathf.Clamp(m_currentGear, 0, 6)], GRMinimumDriveRPM[Mathf.Clamp(m_currentGear, 0, 6)] + m_lowRPMRecoveryBand, m_engineRPM));
+    public float LowRPMDriveRatio => m_type != TransmissionType.Manual || m_currentGear < 3 ? 1f : Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(m_minimumDriveRpm[Mathf.Clamp(m_currentGear, 0, 6)], m_minimumDriveRpm[Mathf.Clamp(m_currentGear, 0, 6)] + m_lowRPMRecoveryBand, m_engineRPM));
 
     // ATが実際にダウンシフトを開始するRPM
-    static readonly float[] GRDownshiftRPM =
+    static readonly float[] m_automaticDownshiftRpm =
     {
         0f,
         0f,
@@ -125,7 +125,7 @@ public class Transmission : MonoBehaviour
         3200f
     };
     // 6MTの公式後退ギア比
-    const float k_GRMtReverseGearRatio = 3.831f;
+    const float m_manualReverseGearRatio = 3.831f;
     [SerializeField]
     float m_reverseGearRatio = 3.590f;
     // このスピード以下にならないとリバースに入らない
@@ -184,57 +184,57 @@ public class Transmission : MonoBehaviour
     // シフトダウン後の過回転を防ぐため車両側が渡すエンジン上限
     float m_shiftMaximumRPM;
     // 変速先の回転数をメーターではなく実際のタイヤ寸法で計算する関数
-    public void ConfigureShiftSafety(float wheelRadius, float maximumRPM)
+    public void ConfigureShiftSafety(float _wheelRadius, float _maximumRPM)
     {
-        m_shiftWheelRadius = Mathf.Max(0.01f, wheelRadius);
-        m_shiftMaximumRPM = Mathf.Max(1f, maximumRPM);
+        m_shiftWheelRadius = Mathf.Max(0.01f, _wheelRadius);
+        m_shiftMaximumRPM = Mathf.Max(1f, _maximumRPM);
     }
 
     // クラッチがつながった時の変速先RPMを車速と減速比から求める関数
-    public float GetSynchronizedRPM(int gear, float speedKph)
+    public float GetSynchronizedRPM(int _gear, float _speedKph)
     {
-        if (gear <= 0 || m_shiftWheelRadius <= 0f)
+        if (_gear <= 0 || m_shiftWheelRadius <= 0f)
         {
             return 0f;
         }
 
-        float wheelRPM = Mathf.Abs(speedKph) / 3.6f / (2f * Mathf.PI * m_shiftWheelRadius) * 60f;
-        return wheelRPM * GetForwardGearRatio(gear) * FinalDriveRatio;
+        float wheelRPM = Mathf.Abs(_speedKph) / 3.6f / (2f * Mathf.PI * m_shiftWheelRadius) * 60f;
+        return wheelRPM * GetForwardGearRatio(_gear) * FinalDriveRatio;
     }
 
     // クラッチが完全接続して空転しない時の車速を前進段の回転数から求める関数
-    public float GetTheoreticalForwardSpeedKph(int gear, float engineRPM, float wheelRadius)
+    public float GetTheoreticalForwardSpeedKph(int _gear, float _engineRPM, float _wheelRadius)
     {
-        if (gear <= 0 || gear > MaxForwardGear || engineRPM < 0f || wheelRadius <= 0f)
+        if (_gear <= 0 || _gear > MaxForwardGear || _engineRPM < 0f || _wheelRadius <= 0f)
         {
             return 0f;
         }
 
         // 無効な計測値を通常の速度として扱わない
-        if (float.IsNaN(engineRPM) || float.IsInfinity(engineRPM) || float.IsNaN(wheelRadius) || float.IsInfinity(wheelRadius))
+        if (float.IsNaN(_engineRPM) || float.IsInfinity(_engineRPM) || float.IsNaN(_wheelRadius) || float.IsInfinity(_wheelRadius))
         {
             return 0f;
         }
 
-        float totalRatio = GetForwardGearRatio(gear) * FinalDriveRatio;
+        float totalRatio = GetForwardGearRatio(_gear) * FinalDriveRatio;
         if (totalRatio <= 0f)
         {
             return 0f;
         }
 
-        return engineRPM / totalRatio * (2f * Mathf.PI * wheelRadius) * 60f / 1000f;
+        return _engineRPM / totalRatio * (2f * Mathf.PI * _wheelRadius) * 60f / 1000f;
     }
 
     // 低回転のシフトアップは許可し過回転する前進段だけを拒否する関数
-    bool IsForwardShiftSafe(int gear)
+    bool IsForwardShiftSafe(int _gear)
     {
         // MTの前進段へのダウン操作は車体側の速度補助で過回転を抑えるため受け付ける
-        if (m_type == TransmissionType.Manual && gear > 0 && gear < m_currentGear)
+        if (m_type == TransmissionType.Manual && _gear > 0 && _gear < m_currentGear)
         {
             return true;
         }
 
-        if (gear <= 0)
+        if (_gear <= 0)
         {
             return true;
         }
@@ -244,7 +244,7 @@ public class Transmission : MonoBehaviour
             return false;
         }
 
-        return GetSynchronizedRPM(gear, m_vehicleSpeed) <= m_shiftMaximumRPM;
+        return GetSynchronizedRPM(_gear, m_vehicleSpeed) <= m_shiftMaximumRPM;
     }
 
     // 停止時の不要な空ぶかしを避けてATのダウンシフト回転合わせを許可する最低車速
@@ -284,7 +284,7 @@ public class Transmission : MonoBehaviour
             }
             else
             {
-                return m_type == TransmissionType.Automatic ? -m_reverseGearRatio : -k_GRMtReverseGearRatio;
+                return m_type == TransmissionType.Automatic ? -m_reverseGearRatio : -m_manualReverseGearRatio;
             }
         }
     }
@@ -303,16 +303,16 @@ public class Transmission : MonoBehaviour
         }
     }
 
-    public int MaxForwardGear => m_type == TransmissionType.Automatic ? GRDatGearRatios.Length - 1 : GetManualGearRatios().Count - 1;
+    public int MaxForwardGear => m_type == TransmissionType.Automatic ? m_automaticGearRatios.Length - 1 : GetManualGearRatios().Count - 1;
 
     // 後退ギア比と最終減速比からレブリミット到達時の理論後退速度を返す関数
-    public float GetTheoreticalReverseMaximumSpeedKph(float wheelRadius, float maximumEngineRPM)
+    public float GetTheoreticalReverseMaximumSpeedKph(float _wheelRadius, float _maximumEngineRPM)
     {
         // ATとMTに対応する後退ギア比
-        float reverseRatio = m_type == TransmissionType.Automatic ? m_reverseGearRatio : k_GRMtReverseGearRatio;
+        float reverseRatio = m_type == TransmissionType.Automatic ? m_reverseGearRatio : m_manualReverseGearRatio;
         // レブリミット時のタイヤ回転数
-        float wheelRPM = maximumEngineRPM / Mathf.Max(0.01f, reverseRatio * FinalDriveRatio);
-        return wheelRPM * 2f * Mathf.PI * Mathf.Max(0.01f, wheelRadius) * 60f / 1000f;
+        float wheelRPM = _maximumEngineRPM / Mathf.Max(0.01f, reverseRatio * FinalDriveRatio);
+        return wheelRPM * 2f * Mathf.PI * Mathf.Max(0.01f, _wheelRadius) * 60f / 1000f;
     }
 
     public int ActiveGear { get => m_currentGear; }
@@ -416,17 +416,17 @@ public class Transmission : MonoBehaviour
     }
 
     // シフトアップより低い車速境界を使い、往復変速を防ぎながら復帰先の前進段を求める関数
-    int GetAutomaticRecoveryGear(float speed)
+    int GetAutomaticRecoveryGear(float _speed)
     {
         // 停止付近はアクセルとRPMに関係なく発進用の1速を選ぶ
-        if (speed <= m_automaticStopDownshiftSpeedKph)
+        if (_speed <= m_automaticStopDownshiftSpeedKph)
         {
             return 1;
         }
 
         // 急減速で複数段が合わなくなった時も、一度の変速で車速に合う段まで戻す
         int targetGear = m_currentGear;
-        while (targetGear > 1 && speed < GetAutomaticShiftSpeed(targetGear - 1) * m_downshiftSpeedRatio)
+        while (targetGear > 1 && _speed < GetAutomaticShiftSpeed(targetGear - 1) * m_downshiftSpeedRatio)
         {
             targetGear--;
         }
@@ -441,8 +441,8 @@ public class Transmission : MonoBehaviour
             return false;
         }
 
-        int gear = Mathf.Clamp(m_currentGear, 0, GRDownshiftRPM.Length - 1);
-        float requiredRPM = GRDownshiftRPM[gear];
+        int gear = Mathf.Clamp(m_currentGear, 0, m_automaticDownshiftRpm.Length - 1);
+        float requiredRPM = m_automaticDownshiftRpm[gear];
         // アクセルを踏んでいるほど早めにダウンシフト
         float throttleBias = Mathf.Lerp(0f, 300f, m_throttleInput);
         return m_engineRPM < requiredRPM + throttleBias;
@@ -533,7 +533,7 @@ public class Transmission : MonoBehaviour
     public bool AutomaticNeutralSelected => m_type == TransmissionType.Automatic && m_automaticNeutralSelected;
 
     // 停止中だけATの走行方向をRとNと1速の順で一段選択する関数
-    public bool RequestAutomaticSelector(bool up, float actualSpeedKph)
+    public bool RequestAutomaticSelector(bool _up, float _actualSpeedKph)
     {
         if (m_type != TransmissionType.Automatic || m_isPullUp)
         {
@@ -541,12 +541,12 @@ public class Transmission : MonoBehaviour
         }
 
         // 後退中や横滑り中の入力も停止として扱わないよう車体の速度の大きさを使う
-        if (float.IsNaN(actualSpeedKph) || float.IsInfinity(actualSpeedKph))
+        if (float.IsNaN(_actualSpeedKph) || float.IsInfinity(_actualSpeedKph))
         {
             return false;
         }
 
-        if (Mathf.Abs(actualSpeedKph) > m_automaticSelectorStopSpeedKph)
+        if (Mathf.Abs(_actualSpeedKph) > m_automaticSelectorStopSpeedKph)
         {
             return false;
         }
@@ -558,7 +558,7 @@ public class Transmission : MonoBehaviour
 
         // 停止直後に高い段が残っていても前進位置を1速として扱う
         int selected = Mathf.Clamp(m_currentGear, -1, 1);
-        int target = Mathf.Clamp(selected + (up ? 1 : -1), -1, 1);
+        int target = Mathf.Clamp(selected + (_up ? 1 : -1), -1, 1);
         if (target == m_currentGear)
         {
             return false;
@@ -702,15 +702,15 @@ public class Transmission : MonoBehaviour
 
     bool ManualShiftLocked => m_type == TransmissionType.Manual && Time.time - m_lastShiftChangeTime < Mathf.Max(0.01f, m_gearChangingTime);
 
-    float GetForwardGearRatio(int gear)
+    float GetForwardGearRatio(int _gear)
     {
         // Nは駆動を伝えず前進段だけ新しい速度配分を適用する
-        if (gear == 0)
+        if (_gear == 0)
         {
             return 0f;
         }
 
-        float targetSpeed = GetBalancedMaximumSpeedKph(gear);
+        float targetSpeed = GetBalancedMaximumSpeedKph(_gear);
         if (targetSpeed > 0f)
         {
             // 車速とタイヤ外周から逆算して速度と駆動トルクの両方に同じギア比を使う
@@ -720,48 +720,48 @@ public class Transmission : MonoBehaviour
 
         if (m_type == TransmissionType.Automatic)
         {
-            return GRDatGearRatios[Mathf.Clamp(gear, 0, GRDatGearRatios.Length - 1)];
+            return m_automaticGearRatios[Mathf.Clamp(_gear, 0, m_automaticGearRatios.Length - 1)];
         }
 
         IReadOnlyList<float> manualRatios = GetManualGearRatios();
-        return manualRatios[Mathf.Clamp(gear, 0, manualRatios.Count - 1)];
+        return manualRatios[Mathf.Clamp(_gear, 0, manualRatios.Count - 1)];
     }
 
-    // シーン側のMTギア比が不足している時だけGRヤリス6MTの予備値を返す関数
+    // シーン側のMTギア比が不足している時だけ車両6MTの予備値を返す関数
     IReadOnlyList<float> GetManualGearRatios()
     {
         if (m_useRequestedSixSpeedRatios)
         {
-            return GRMtGearRatios;
+            return m_manualGearRatios;
         }
 
-        return m_gearRatioList != null && m_gearRatioList.Count >= GRMtGearRatios.Length ? m_gearRatioList : GRMtGearRatios;
+        return m_gearRatioList != null && m_gearRatioList.Count >= m_manualGearRatios.Length ? m_gearRatioList : m_manualGearRatios;
     }
 
-    float GetAutomaticShiftSpeed(int gear)
+    float GetAutomaticShiftSpeed(int _gear)
     {
         // 旧速度表によって新しいギアで変速できなくなることを防ぐ
-        if (m_type == TransmissionType.Automatic && GetBalancedMaximumSpeedKph(gear) > 0f)
+        if (m_type == TransmissionType.Automatic && GetBalancedMaximumSpeedKph(_gear) > 0f)
         {
             float radius = m_shiftWheelRadius > 0f ? m_shiftWheelRadius : m_gearingReferenceWheelRadius;
             float maximumRPM = m_shiftMaximumRPM > 0f ? m_shiftMaximumRPM : m_gearingReferenceRPM;
-            return GetTheoreticalForwardSpeedKph(gear, Mathf.Min(m_shiftUpEngineRPM, maximumRPM), radius);
+            return GetTheoreticalForwardSpeedKph(_gear, Mathf.Min(m_shiftUpEngineRPM, maximumRPM), radius);
         }
 
-        return GRDatShiftUpSpeedKph[Mathf.Clamp(gear, 0, GRDatShiftUpSpeedKph.Length - 1)];
+        return m_automaticShiftUpSpeedKph[Mathf.Clamp(_gear, 0, m_automaticShiftUpSpeedKph.Length - 1)];
     }
 
     // 設定不足や逆転した速度表を使わず有効な前進段の目標速度だけ取得する関数
-    float GetBalancedMaximumSpeedKph(int gear)
+    float GetBalancedMaximumSpeedKph(int _gear)
     {
-        if (!m_useBalancedForwardSpeeds || gear <= 0)
+        if (!m_useBalancedForwardSpeeds || _gear <= 0)
         {
             return 0f;
         }
 
         float[] speeds = m_type == TransmissionType.Automatic ? m_automaticMaximumSpeedsKph : m_manualMaximumSpeedsKph;
-        int count = m_type == TransmissionType.Automatic ? GRDatGearRatios.Length - 1 : GetManualGearRatios().Count - 1;
-        if (speeds == null || speeds.Length != count || gear > count)
+        int count = m_type == TransmissionType.Automatic ? m_automaticGearRatios.Length - 1 : GetManualGearRatios().Count - 1;
+        if (speeds == null || speeds.Length != count || _gear > count)
         {
             return 0f;
         }
@@ -783,6 +783,6 @@ public class Transmission : MonoBehaviour
             previousSpeed = speed;
         }
 
-        return speeds[gear - 1];
+        return speeds[_gear - 1];
     }
 }

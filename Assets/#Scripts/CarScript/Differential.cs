@@ -39,10 +39,11 @@ public partial class Differential : MonoBehaviour
     DifferentialType m_differentialType = DifferentialType.LimitedSlip;
     [SerializeField, ShowInInspector]
     float m_lockRatio;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_customLockRatio_LSD")]
     [SerializeField, Range(0f, 1f)]
-    float m_customLockRatio_LSD = 0.35f;
+    float m_customLockRatioLSD = 0.35f;
     // ノーマルで前輪に渡す基本配分を保存し、既存シーンの設定を引き継ぐ
-    [Header("GR-FOUR Normal")]
+    [Header("駆動モード Normal")]
     [SerializeField, Range(0f, 1f)]
     float m_frontTorqueRatio = 0.60f;
     // 旧発進配分の保存値を残すが、選択モードの配分には上書きしない
@@ -54,15 +55,15 @@ public partial class Differential : MonoBehaviour
 #pragma warning restore CS0414
     [SerializeField, Range(0f, 1f)]
     float m_centerLockRatio = 0.35f;
-    public void SetFinalDriveRatio(float ratio)
+    public void SetFinalDriveRatio(float _ratio)
     {
-        m_differentialGearRatio = Mathf.Max(0.01f, ratio);
+        m_differentialGearRatio = Mathf.Max(0.01f, _ratio);
     }
 
-    float m_wheelAngularVelocity_LeftFront;
-    float m_wheelAngularVelocity_LeftRear;
-    float m_wheelAngularVelocity_RightFront;
-    float m_wheelAngularVelocity_RightRear;
+    float m_wheelAngularVelocityLeftFront;
+    float m_wheelAngularVelocityLeftRear;
+    float m_wheelAngularVelocityRightFront;
+    float m_wheelAngularVelocityRightRear;
     float m_wheelInertia;
     // 入力トルク
     float m_inputTorque;
@@ -79,24 +80,24 @@ public partial class Differential : MonoBehaviour
         }
     }
 
-    public float GetDriveTorque(bool isFront, bool isRight)
+    public float GetDriveTorque(bool _isFront, bool _isRight)
     {
         // 選択モードの配分を四輪で共有し、発進中もスポーツやトラックの指定を保つ
         float dynamicFrontRatio = AppliedFrontTorqueRatio;
-        float axleRatio = isFront ? dynamicFrontRatio : 1f - dynamicFrontRatio;
+        float axleRatio = _isFront ? dynamicFrontRatio : 1f - dynamicFrontRatio;
         float baseWheelTorque = m_inputTorque * m_differentialGearRatio * axleRatio * 0.5f;
         // 回転方向を残した前後差を使い、後退でも空転している車軸の回転を抑える
-        float frontSpeed = (m_wheelAngularVelocity_LeftFront + m_wheelAngularVelocity_RightFront) * 0.5f;
-        float rearSpeed = (m_wheelAngularVelocity_LeftRear + m_wheelAngularVelocity_RightRear) * 0.5f;
+        float frontSpeed = (m_wheelAngularVelocityLeftFront + m_wheelAngularVelocityRightFront) * 0.5f;
+        float rearSpeed = (m_wheelAngularVelocityLeftRear + m_wheelAngularVelocityRightRear) * 0.5f;
         float centerRequest = (frontSpeed - rearSpeed) * m_wheelInertia / Mathf.Max(Time.fixedDeltaTime, 0.001f) * m_centerLockRatio * 0.5f;
         float centerLimit = Mathf.Abs(m_inputTorque * m_differentialGearRatio) * 0.12f;
         // 配分をエディタで極端に変えても、移動元のトルクを超えて逆駆動させない
         float availablePerWheel = Mathf.Abs(m_inputTorque * m_differentialGearRatio) * Mathf.Min(dynamicFrontRatio, 1f - dynamicFrontRatio) * 0.5f;
         centerLimit = Mathf.Min(centerLimit, availablePerWheel);
         float centerTransfer = Mathf.Clamp(centerRequest, -centerLimit, centerLimit);
-        baseWheelTorque += isFront ? -centerTransfer : centerTransfer;
-        float leftSpeed = isFront ? m_wheelAngularVelocity_LeftFront : m_wheelAngularVelocity_LeftRear;
-        float rightSpeed = isFront ? m_wheelAngularVelocity_RightFront : m_wheelAngularVelocity_RightRear;
+        baseWheelTorque += _isFront ? -centerTransfer : centerTransfer;
+        float leftSpeed = _isFront ? m_wheelAngularVelocityLeftFront : m_wheelAngularVelocityLeftRear;
+        float rightSpeed = _isFront ? m_wheelAngularVelocityRightFront : m_wheelAngularVelocityRightRear;
         switch (m_differentialType)
         {
             case DifferentialType.None:
@@ -109,7 +110,7 @@ public partial class Differential : MonoBehaviour
                 m_lockRatio = 1f;
                 break;
             default:
-                m_lockRatio = m_customLockRatio_LSD;
+                m_lockRatio = m_customLockRatioLSD;
                 break;
         }
 
@@ -118,28 +119,28 @@ public partial class Differential : MonoBehaviour
         float requestedTransfer = speedDifference * m_wheelInertia / Mathf.Max(Time.fixedDeltaTime, 0.001f) * m_lockRatio;
         float transferLimit = Mathf.Abs(baseWheelTorque) * 0.45f;
         float transferTorque = Mathf.Clamp(requestedTransfer, -transferLimit, transferLimit);
-        return isRight ? baseWheelTorque + transferTorque : baseWheelTorque - transferTorque;
+        return _isRight ? baseWheelTorque + transferTorque : baseWheelTorque - transferTorque;
     }
 
-    public float GetShaftVelocity(float wheelAngularVelocity, float wheelInertia, bool isFront, bool isRight)
+    public float GetShaftVelocity(float _wheelAngularVelocity, float _wheelInertia, bool _isFront, bool _isRight)
     {
-        if (isFront)
+        if (_isFront)
         {
-            if (isRight)
-                m_wheelAngularVelocity_RightFront = wheelAngularVelocity;
+            if (_isRight)
+                m_wheelAngularVelocityRightFront = _wheelAngularVelocity;
             else
-                m_wheelAngularVelocity_LeftFront = wheelAngularVelocity;
+                m_wheelAngularVelocityLeftFront = _wheelAngularVelocity;
         }
         else
         {
-            if (isRight)
-                m_wheelAngularVelocity_RightRear = wheelAngularVelocity;
+            if (_isRight)
+                m_wheelAngularVelocityRightRear = _wheelAngularVelocity;
             else
-                m_wheelAngularVelocity_LeftRear = wheelAngularVelocity;
+                m_wheelAngularVelocityLeftRear = _wheelAngularVelocity;
         }
 
-        m_wheelInertia = wheelInertia;
-        float averageWheelSpeed = (m_wheelAngularVelocity_LeftFront + m_wheelAngularVelocity_RightFront + m_wheelAngularVelocity_LeftRear + m_wheelAngularVelocity_RightRear) * 0.25f;
+        m_wheelInertia = _wheelInertia;
+        float averageWheelSpeed = (m_wheelAngularVelocityLeftFront + m_wheelAngularVelocityRightFront + m_wheelAngularVelocityLeftRear + m_wheelAngularVelocityRightRear) * 0.25f;
         return averageWheelSpeed * m_differentialGearRatio;
     }
 #region Legacy fixed four-way split (kept for comparison)

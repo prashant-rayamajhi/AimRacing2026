@@ -3,11 +3,11 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 #endif
-// 既存デフへGR-FOURのモード選択と滑らかな前後配分の切替を追加するクラス
+// 既存デフへ走行モードの選択と滑らかな前後配分の切替を追加するクラス
 public partial class Differential
 {
-    // 2020年型GR-FOURに対応する前後駆動配分の選択肢
-    public enum GRFourMode
+    // 前後駆動配分と操縦補助を切り替える走行モード
+    public enum DriveMode
     {
         Normal,
         Sport,
@@ -15,9 +15,9 @@ public partial class Differential
     }
 
     // 発進から走行終了まで使用する駆動モード
-    [Header("GR-FOUR Mode (1 Normal / 2 Sport / 3 Track)")]
+    [Header("Drive Mode (1 Normal / 2 Sport / 3 Track)")]
     [SerializeField]
-    GRFourMode m_driveMode = GRFourMode.Normal;
+    DriveMode m_driveMode = DriveMode.Normal;
     // スポーツで後輪寄りの駆動特性を作る前輪配分
     [SerializeField, Range(0f, 1f)]
     float m_sportFrontTorqueRatio = 0.30f;
@@ -47,7 +47,7 @@ public partial class Differential
     // Sportの操舵とタイヤを駆動配分と同じ時間で切り替える割合
     public float SportHandlingBlend { get; private set; }
     // インスペクターや検証から現在の選択を読み取るプロパティ
-    public GRFourMode CurrentMode => m_driveMode;
+    public DriveMode CurrentMode => m_driveMode;
     // 配分切替が目指す前輪比率を読み取るプロパティ
     public float TargetFrontTorqueRatio => GetModeFrontRatio(m_driveMode);
     // 中央差動制限を加える前の補間済み前輪比率を読み取るプロパティ
@@ -59,8 +59,8 @@ public partial class Differential
         m_pressedModeDevices.Clear();
         m_appliedFrontTorqueRatio = TargetFrontTorqueRatio;
         m_distributionInitialized = true;
-        TrackHandlingBlend = m_driveMode == GRFourMode.Track ? 1f : 0f;
-        SportHandlingBlend = m_driveMode == GRFourMode.Sport ? 1f : 0f;
+        TrackHandlingBlend = m_driveMode == DriveMode.Track ? 1f : 0f;
+        SportHandlingBlend = m_driveMode == DriveMode.Sport ? 1f : 0f;
     }
 
     // 数字キーとG923の専用ボタンで既存のペダルや操舵入力に干渉せずモードを選ぶ関数
@@ -100,15 +100,15 @@ public partial class Differential
 #endif
         if (normal)
         {
-            SetDriveMode(GRFourMode.Normal);
+            SetDriveMode(DriveMode.Normal);
         }
         else if (sport)
         {
-            SetDriveMode(GRFourMode.Sport);
+            SetDriveMode(DriveMode.Sport);
         }
         else if (track)
         {
-            SetDriveMode(GRFourMode.Track);
+            SetDriveMode(DriveMode.Track);
         }
     }
 
@@ -158,40 +158,40 @@ public partial class Differential
                         continue;
                     }
 
-                    Debug.LogWarning($"[GR-FOUR] {m_g923ModeButton} は {action.name} が使用中のため切替を中止しました。", this);
+                    Debug.LogWarning($"[駆動モード] {m_g923ModeButton} は {action.name} が使用中のため切替を中止しました。", this);
                     return;
                 }
             }
 
-            SetDriveMode(m_driveMode == GRFourMode.Track ? GRFourMode.Normal : GRFourMode.Track);
+            SetDriveMode(m_driveMode == DriveMode.Track ? DriveMode.Normal : DriveMode.Track);
             return;
         }
     }
 
 #endif
     // 不正な選択値を拒否して駆動モードの切替先を更新する関数
-    public void SetDriveMode(GRFourMode mode)
+    public void SetDriveMode(DriveMode _mode)
     {
-        if (mode != GRFourMode.Normal && mode != GRFourMode.Sport && mode != GRFourMode.Track)
+        if (_mode != DriveMode.Normal && _mode != DriveMode.Sport && _mode != DriveMode.Track)
         {
             return;
         }
 
-        if (mode == m_driveMode)
+        if (_mode == m_driveMode)
         {
             return;
         }
 
-        m_driveMode = mode;
+        m_driveMode = _mode;
     }
 
     // 四輪のトルク計算前に一度だけ前後配分を更新する関数
-    public void UpdateDriveDistribution(float deltaTime)
+    public void UpdateDriveDistribution(float _deltaTime)
     {
         // モードの名前だけでなく旋回設定も同じ速度で切り替える
-        TrackHandlingBlend = Mathf.MoveTowards(TrackHandlingBlend, m_driveMode == GRFourMode.Track ? 1f : 0f, Mathf.Max(0.01f, m_modeBlendRate) * Mathf.Max(0f, deltaTime));
+        TrackHandlingBlend = Mathf.MoveTowards(TrackHandlingBlend, m_driveMode == DriveMode.Track ? 1f : 0f, Mathf.Max(0.01f, m_modeBlendRate) * Mathf.Max(0f, _deltaTime));
         // 切替途中で別モードを選んでも二つの補助割合の合計を1以下に保つ
-        SportHandlingBlend = Mathf.MoveTowards(SportHandlingBlend, m_driveMode == GRFourMode.Sport ? 1f : 0f, Mathf.Max(0.01f, m_modeBlendRate) * Mathf.Max(0f, deltaTime));
+        SportHandlingBlend = Mathf.MoveTowards(SportHandlingBlend, m_driveMode == DriveMode.Sport ? 1f : 0f, Mathf.Max(0.01f, m_modeBlendRate) * Mathf.Max(0f, _deltaTime));
         // 初期化直後は選択モードを使い、走行中の切替だけを補間する
         if (!m_distributionInitialized)
         {
@@ -199,17 +199,17 @@ public partial class Differential
             m_distributionInitialized = true;
         }
 
-        m_appliedFrontTorqueRatio = Mathf.MoveTowards(m_appliedFrontTorqueRatio, TargetFrontTorqueRatio, Mathf.Max(0.01f, m_modeBlendRate) * Mathf.Max(0f, deltaTime));
+        m_appliedFrontTorqueRatio = Mathf.MoveTowards(m_appliedFrontTorqueRatio, TargetFrontTorqueRatio, Mathf.Max(0.01f, m_modeBlendRate) * Mathf.Max(0f, _deltaTime));
     }
 
     // 選択モードに対応する前輪比率を安全な範囲で返す関数
-    float GetModeFrontRatio(GRFourMode mode)
+    float GetModeFrontRatio(DriveMode _mode)
     {
-        switch (mode)
+        switch (_mode)
         {
-            case GRFourMode.Sport:
+            case DriveMode.Sport:
                 return Mathf.Clamp01(m_sportFrontTorqueRatio);
-            case GRFourMode.Track:
+            case DriveMode.Track:
                 return Mathf.Clamp01(m_trackFrontTorqueRatio);
             default:
                 return Mathf.Clamp01(m_frontTorqueRatio);

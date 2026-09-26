@@ -15,5 +15,4 @@ public class ShowInInspectorDrawer : PropertyDrawer
         EditorGUI.EndDisabledGroup();
     }
 }
-
 #endif

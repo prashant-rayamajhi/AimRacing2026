@@ -111,7 +111,7 @@ public class Steering : MonoBehaviour
     // モード切替時に古い舵角が飛び出さないよう常時更新する応答用舵角
     float m_trackCenterAngle;
     // 入力機器に応じて操舵入力と判定用速度を滑らかに更新する関数
-    public void UpdateSteering(float deltaTime)
+    public void UpdateSteering(float _deltaTime)
     {
         // G923などのアナログ入力の中央付近にある微小な揺れを除去する
         float targetInput = Mathf.Clamp(m_inputAngle, -1f, 1f);
@@ -126,7 +126,7 @@ public class Steering : MonoBehaviour
             float speedRatio = Mathf.InverseLerp(m_steeringReductionStartKph, m_fullReductionSpeedKph, Mathf.Abs(VehicleSpeedKph));
             float highSpeedSteerRate = Mathf.Lerp(m_keyboardSteerRate, m_keyboardSteerRate * 0.65f, speedRatio);
             // 左右の切り返しではまず戻し速度で中央へ戻し残り時間だけ反対へ切る
-            float remainingTime = Mathf.Max(0f, deltaTime);
+            float remainingTime = Mathf.Max(0f, _deltaTime);
             bool reversing = targetInput * m_currentInput < 0f;
             if (reversing)
             {
@@ -153,7 +153,7 @@ public class Steering : MonoBehaviour
         // Sportの戻しは維持しTrackだけ切り返しの急激な横力変化を丸める
         float modeReturnTime = Mathf.Lerp(m_trackReturnResponseSeconds, m_trackDriftReturnSeconds, TrackHandlingBlend / Mathf.Max(0.001f, modeAmount));
         float responseTime = returning ? modeReturnTime : turnTime;
-        float response = 1f - Mathf.Exp(-Mathf.Max(0f, deltaTime) / Mathf.Max(0.001f, responseTime));
+        float response = 1f - Mathf.Exp(-Mathf.Max(0f, _deltaTime) / Mathf.Max(0.001f, responseTime));
         m_trackCenterAngle = track <= 0f ? targetAngle : Mathf.Lerp(m_trackCenterAngle, targetAngle, response);
         CurrentCenterAngle = Mathf.Lerp(targetAngle, m_trackCenterAngle, track);
     }
@@ -200,20 +200,27 @@ public class Steering : MonoBehaviour
         return shapedInput * effectiveMaxAngle;
     }
 
+    [UnityEngine.Serialization.FormerlySerializedAs("steerFactor")]
     [Space]
     // ステア角補正ファクター
     [SerializeField]
-    private float steerFactor;
+    private float m_steerFactor;
     // パラメータ(値を増やすと曲がらなくなる)
     // 倍率
-    public float lowSpeedCoefStart = 1.2f;
+    [UnityEngine.Serialization.FormerlySerializedAs("lowSpeedCoefStart")]
+    public float m_lowSpeedCoefStart = 1.2f;
     // 収束
-    public float lowSpeedCoefEnd = 1.0f;
-    public float highSpeedCoefStart = 1.0f;
-    public float highSpeedCoefEnd = 0.3f;
+    [UnityEngine.Serialization.FormerlySerializedAs("lowSpeedCoefEnd")]
+    public float m_lowSpeedCoefEnd = 1.0f;
+    [UnityEngine.Serialization.FormerlySerializedAs("highSpeedCoefStart")]
+    public float m_highSpeedCoefStart = 1.0f;
+    [UnityEngine.Serialization.FormerlySerializedAs("highSpeedCoefEnd")]
+    public float m_highSpeedCoefEnd = 0.3f;
     // 速度に応じた倍率の係数
-    public float SpeedCoefMin = 1.0f;
-    public float SpeedCoefMax = 1.2f;
+    [UnityEngine.Serialization.FormerlySerializedAs("SpeedCoefMin")]
+    public float m_speedCoefMin = 1.0f;
+    [UnityEngine.Serialization.FormerlySerializedAs("SpeedCoefMax")]
+    public float m_speedCoefMax = 1.2f;
     float CalcAckermanAngle(float _steerAngle, bool _isRight)
     {
         float absoluteAngle = Mathf.Abs(_steerAngle) * Mathf.Deg2Rad;
@@ -234,16 +241,16 @@ public class Steering : MonoBehaviour
     // 内側の切れ角から外側の切れ角を計算する
     float CalcAckermanOutsideAngle(float _insideAngle, float _steerAngle)
     {
-        bool IsRight = true;
+        bool isRight = true;
         if (_insideAngle < 0)
         {
             _insideAngle *= -1;
-            IsRight = false;
+            isRight = false;
         }
 
         float tanA = Mathf.Tan(_insideAngle * Mathf.Deg2Rad);
         float angle = Mathf.Atan(m_wheelBase * tanA / ((m_treadWidth * tanA) + m_wheelBase)) * Mathf.Rad2Deg;
-        if (!IsRight)
+        if (!isRight)
         {
             angle *= -1;
         }

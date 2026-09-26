@@ -100,7 +100,7 @@ public class DriveSound : MonoBehaviour
     // 踏み直した瞬間の回転数で音の立ち上がり時間を確定するための秒数
     float m_currentTurboAttackSeconds = 0.9f;
     // 既存FMODの再生区間0.01～0.99内へ入れるための発火値
-    const float BackTurbinTriggerValue = 0.5f;
+    const float m_backTurbinTriggerValue = 0.5f;
     // 踏み直し時のタービン音の立ち上がりを回転数別に調整する設定
     [SerializeField]
     AnimationCurve m_turboAttackSeconds = new AnimationCurve(new Keyframe(3000f, 0.9f), new Keyframe(4500f, 0.45f), new Keyframe(5500f, 0.22f));
@@ -119,7 +119,7 @@ public class DriveSound : MonoBehaviour
     // カウント中の全開だけ既存レブ音を単独再生するための音量制御
     readonly CountdownRevIsolation m_countdownRevIsolation = new CountdownRevIsolation();
     // 全開ペダルの小さな入力誤差で専用音が途切れないための判定値
-    const float CountdownFullThrottle = 0.98f;
+    const float m_countdownFullThrottle = 0.98f;
     // 燃料復帰中の短い回転低下ではレブ音を止めないための回転差
     [SerializeField, Min(0f)]
     float m_revSoundReleaseMarginRPM = 250f;
@@ -129,7 +129,7 @@ public class DriveSound : MonoBehaviour
     // バンクへ送った音用回転数とタービン補正の回転数を一致させる記録
     float m_soundRPM;
     // 既存DriveバンクのRPM音程カーブを半音単位で再現する関数
-    static float GetBankTurboRPMPitch(float rpm)
+    static float GetBankTurboRPMPitch(float _rpm)
     {
         // FMOD編集データの三点を使用しエンジン本体のRPMは変更しない
         const float peakRPM = 7093.3054f;
@@ -137,20 +137,20 @@ public class DriveSound : MonoBehaviour
         const float lowPitch = -7f;
         const float peakPitch = 0.802639f;
         const float highPitch = -3.5f;
-        if (rpm <= peakRPM)
+        if (_rpm <= peakRPM)
         {
-            return Mathf.Lerp(lowPitch, peakPitch, Mathf.Clamp01(rpm / peakRPM));
+            return Mathf.Lerp(lowPitch, peakPitch, Mathf.Clamp01(_rpm / peakRPM));
         }
 
-        return Mathf.Lerp(peakPitch, highPitch, Mathf.InverseLerp(peakRPM, maximumRPM, rpm));
+        return Mathf.Lerp(peakPitch, highPitch, Mathf.InverseLerp(peakRPM, maximumRPM, _rpm));
     }
 
     // タービンだけの既存音程補正を相殺して踏み直しの立ち上がりを送る関数
-    static float CalculateTurboParameter(float spool, float rpm, float plateauRPM)
+    static float CalculateTurboParameter(float _spool, float _rpm, float _plateauRPM)
     {
         // TURBOの音程幅は既存バンクのマイナス11半音からプラス8半音
         const float pitchSpan = 19f;
-        if (spool <= 0f)
+        if (_spool <= 0f)
         {
             return 0f;
         }
@@ -160,21 +160,21 @@ public class DriveSound : MonoBehaviour
         const float minimumParameterPitch = -11f;
         const float maximumBankRPMPitch = 0.802639f;
         float lowPitch = minimumParameterPitch + maximumBankRPMPitch;
-        float highPitch = minimumParameterPitch + pitchSpan + GetBankTurboRPMPitch(plateauRPM);
-        float requestedPitch = Mathf.Lerp(lowPitch, highPitch, Mathf.Clamp01(spool));
-        return Mathf.Clamp01((requestedPitch - GetBankTurboRPMPitch(rpm) - minimumParameterPitch) / pitchSpan);
+        float highPitch = minimumParameterPitch + pitchSpan + GetBankTurboRPMPitch(_plateauRPM);
+        float requestedPitch = Mathf.Lerp(lowPitch, highPitch, Mathf.Clamp01(_spool));
+        return Mathf.Clamp01((requestedPitch - GetBankTurboRPMPitch(_rpm) - minimumParameterPitch) / pitchSpan);
     }
 
     // バンクへの送信失敗を一度だけ通知して無音の原因を見つけられるようにする関数
-    void SendSoundParameter(string parameter, float value)
+    void SendSoundParameter(string _parameter, float _value)
     {
-        FMOD.RESULT result = m_driveEvent.setParameterByName(parameter, value);
-        if (result == FMOD.RESULT.OK || !m_failedSoundParameters.Add(parameter))
+        FMOD.RESULT result = m_driveEvent.setParameterByName(_parameter, _value);
+        if (result == FMOD.RESULT.OK || !m_failedSoundParameters.Add(_parameter))
         {
             return;
         }
 
-        AppLog.LogError($"[DriveSound] {parameter}を送信できません: {result}。イベントと読み込んだバンクを確認してください。", this);
+        AppLog.LogError($"[DriveSound] {_parameter}を送信できません: {result}。イベントと読み込んだバンクを確認してください。", this);
     }
 
     // 変速とアクセル切替の音だけを短く揺らす演出設定で実エンジン回転は変えない
@@ -239,33 +239,42 @@ public class DriveSound : MonoBehaviour
     // ターボ・バックタービン音用変数
     public float m_turboComp = 0.0f; // 加圧の割合
     // エンブレ用
-    float m_EngineBreak = 0f;
-    float m_EG_DampingRatio = 1.0f;
+    float m_engineBreak = 0f;
+    float m_egDampingRatio = 1.0f;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_EngineVolume")]
     [Header("PartsVolume")]
     [SerializeField, Range(0.0f, 1.0f)]
-    float m_EngineVolume;
-    float m_RestEnginVolume;
+    float m_engineVolume;
+    float m_lastEngineVolume;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_MissionVolume")]
     [SerializeField, Range(0.0f, 1.0f)]
-    float m_MissionVolume;
-    float m_RestMissionVolume;
+    float m_missionVolume;
+    float m_lastMissionVolume;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_TurboVolume")]
     [SerializeField, Range(0.0f, 1.0f)]
-    float m_TurboVolume;
-    float m_RestTurboVolume;
+    float m_turboVolume;
+    float m_lastTurboVolume;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_RoadVolume")]
     [SerializeField, Range(0.0f, 1.0f)]
-    float m_RoadVolume;
-    float m_RestRoadVolume;
+    float m_roadVolume;
+    float m_lastRoadVolume;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_GearUpVolume")]
     [SerializeField, Range(0.0f, 1.0f)]
-    float m_GearUpVolume;
-    float m_RestGearUpVolume;
+    float m_gearUpVolume;
+    float m_lastGearUpVolume;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_GearDownVolume")]
     [SerializeField, Range(0.0f, 1.0f)]
-    float m_GearDownVolume;
-    float m_RestGearDownVolume;
+    float m_gearDownVolume;
+    float m_lastGearDownVolume;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_breakVolume")]
+    [UnityEngine.Serialization.FormerlySerializedAs("m_BreakVolume")]
     [SerializeField, Range(0.0f, 1.0f)]
-    float m_BreakVolume;
-    float m_RestBreakVolume;
+    float m_brakeVolume;
+    float m_lastBrakeVolume;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_UpdateInterval")]
     [SerializeField]
-    float m_UpdateInterval = 0.5f;
-    float m_UpdateTime;
+    float m_updateInterval = 0.5f;
+    float m_updateTime;
     private void Start()
     {
         m_mission = m_vehicle.Transmission;
@@ -281,20 +290,20 @@ public class DriveSound : MonoBehaviour
         m_driveEvent.start();
         RuntimeManager.AttachInstanceToGameObject(m_driveEvent, gameObject.transform);
         // ボリュームの初期値を保存
-        m_RestEnginVolume = m_EngineVolume;
-        m_RestMissionVolume = m_MissionVolume;
-        m_RestTurboVolume = m_TurboVolume;
-        m_RestRoadVolume = m_RoadVolume;
-        m_RestGearUpVolume = m_GearUpVolume;
-        m_RestGearDownVolume = m_GearDownVolume;
-        m_RestBreakVolume = m_BreakVolume;
-        m_driveEvent.setParameterByName("ENGINEVOL", m_EngineVolume);
-        m_driveEvent.setParameterByName("MISSIONVOL", m_MissionVolume);
-        m_driveEvent.setParameterByName("TURBOVOL", m_TurboVolume);
-        m_driveEvent.setParameterByName("ROADVOL", m_RoadVolume);
-        m_driveEvent.setParameterByName("GEARUPVOL", m_GearUpVolume);
-        m_driveEvent.setParameterByName("GEARDOWNVOL", m_GearDownVolume);
-        m_driveEvent.setParameterByName("BREAKVOL", m_BreakVolume);
+        m_lastEngineVolume = m_engineVolume;
+        m_lastMissionVolume = m_missionVolume;
+        m_lastTurboVolume = m_turboVolume;
+        m_lastRoadVolume = m_roadVolume;
+        m_lastGearUpVolume = m_gearUpVolume;
+        m_lastGearDownVolume = m_gearDownVolume;
+        m_lastBrakeVolume = m_brakeVolume;
+        m_driveEvent.setParameterByName("ENGINEVOL", m_engineVolume);
+        m_driveEvent.setParameterByName("MISSIONVOL", m_missionVolume);
+        m_driveEvent.setParameterByName("TURBOVOL", m_turboVolume);
+        m_driveEvent.setParameterByName("ROADVOL", m_roadVolume);
+        m_driveEvent.setParameterByName("GEARUPVOL", m_gearUpVolume);
+        m_driveEvent.setParameterByName("GEARDOWNVOL", m_gearDownVolume);
+        m_driveEvent.setParameterByName("BREAKVOL", m_brakeVolume);
     }
 
     private void Update()
@@ -319,8 +328,8 @@ public class DriveSound : MonoBehaviour
         // エンジンミュート
         // シフトチェンジ
         float engineMute = 0f;
-        float ShiftUp = 0f;
-        float ShiftDown = 0f;
+        float shiftUp = 0f;
+        float shiftDown = 0f;
         // 待機中の一速準備で空ぶかし音を消さず走行中の変速音だけを切り替える
         if (m_mission.IsGearChanging && !m_vehicle.IsPullUp)
         {
@@ -329,18 +338,18 @@ public class DriveSound : MonoBehaviour
             engineMute = 0f;
             if (m_mission.IsShiftUp)
             {
-                ShiftUp = 1f;
+                shiftUp = 1f;
             }
             else
             {
-                ShiftDown = 1f;
-                m_EngineBreak = 1f;
+                shiftDown = 1f;
+                m_engineBreak = 1f;
             }
         }
 
-        SendSoundParameter("SHIFTUP", ShiftUp);
+        SendSoundParameter("SHIFTUP", shiftUp);
         // 既存DriveのBackfireはSHIFTDOWNで接続されているため送信失敗を見逃さない
-        SendSoundParameter("SHIFTDOWN", ShiftDown);
+        SendSoundParameter("SHIFTDOWN", shiftDown);
         m_driveEvent.setParameterByName("MUTE", engineMute);
         // 変速通知は音量と分けATの部分消音中も変速イベントとして通知する
         // 既存バンクの正式名にそろえ送信失敗も記録する
@@ -354,7 +363,7 @@ public class DriveSound : MonoBehaviour
         // 通常音量の更新後に走行中のアクセルオフ分だけを加える
         bool coasting = !m_vehicle.IsPullUp && m_vehicle.ActiveGear != 0 && Mathf.Abs(m_vehicle.KPH) >= m_missionCoastMinimumKPH && m_vehicle.Accel <= m_soundOffThreshold;
         m_missionCoastBlend = Mathf.MoveTowards(m_missionCoastBlend, coasting ? 1f : 0f, Time.deltaTime / Mathf.Max(0.01f, m_missionCoastBlendSeconds));
-        SendSoundParameter("MISSIONVOL", Mathf.Clamp01(m_MissionVolume + m_missionCoastVolumeOffset * m_missionCoastBlend));
+        SendSoundParameter("MISSIONVOL", Mathf.Clamp01(m_missionVolume + m_missionCoastVolumeOffset * m_missionCoastBlend));
         m_backTurbinGain.Tick(m_driveEvent, m_backTurbinGainDb);
         m_antilagGain.Tick(m_driveEvent, m_antilagGainDb);
         // 走行中はエンジンの枝を消音せずREVLIMITパラメーターで専用音を重ねる
@@ -363,33 +372,33 @@ public class DriveSound : MonoBehaviour
     }
 
     // 待機中に全開でリミッターへ当たり続けている区間だけ専用音を選ぶ関数
-    internal static bool ShouldSoloCountdownRev(bool waiting, float throttle, bool limiterHeld)
+    internal static bool ShouldSoloCountdownRev(bool _waiting, float _throttle, bool _limiterHeld)
     {
-        return waiting && throttle >= CountdownFullThrottle && limiterHeld;
+        return _waiting && _throttle >= m_countdownFullThrottle && _limiterHeld;
     }
 
     // 速度と実ギアからミッション専用の音程差を求めエンジンとタービンには適用しない関数
-    float CalculateMissionCorrection(float speed, int gear)
+    float CalculateMissionCorrection(float _speed, int _gear)
     {
         // 配列設定が不足した場合は既存バンクの音程を維持する
-        if (gear < 1 || gear > 6 || m_missionSoundTopKPH == null || m_missionSoundLowSemitones == null)
+        if (_gear < 1 || _gear > 6 || m_missionSoundTopKPH == null || m_missionSoundLowSemitones == null)
         {
             return 0f;
         }
 
-        if (m_missionSoundTopKPH.Length < gear || m_missionSoundLowSemitones.Length < gear)
+        if (m_missionSoundTopKPH.Length < _gear || m_missionSoundLowSemitones.Length < _gear)
         {
             return 0f;
         }
 
-        float startSpeed = gear == 1 ? 0f : m_missionSoundTopKPH[gear - 2];
-        float endSpeed = Mathf.Max(startSpeed + 1f, m_missionSoundTopKPH[gear - 1]);
-        float progress = Mathf.InverseLerp(startSpeed, endSpeed, Mathf.Abs(speed));
-        float target = m_missionSoundLowSemitones[gear - 1] + progress * m_missionSoundRiseSemitones;
+        float startSpeed = _gear == 1 ? 0f : m_missionSoundTopKPH[_gear - 2];
+        float endSpeed = Mathf.Max(startSpeed + 1f, m_missionSoundTopKPH[_gear - 1]);
+        float progress = Mathf.InverseLerp(startSpeed, endSpeed, Mathf.Abs(_speed));
+        float target = m_missionSoundLowSemitones[_gear - 1] + progress * m_missionSoundRiseSemitones;
         // 既存Driveバンクの速度カーブとギア補正を相殺するための元音程
         const float bankSpeedKnee = 40.02463f;
-        float bankSpeedPitch = speed <= bankSpeedKnee ? Mathf.Lerp(-21f, -14f, Mathf.InverseLerp(0f, bankSpeedKnee, speed)) : Mathf.Lerp(-14f, 6f, Mathf.InverseLerp(bankSpeedKnee, 250f, speed));
-        float bankGearPitch = gear <= 4 ? gear * 1.5f : gear == 5 ? 8.25f : 9.75f;
+        float bankSpeedPitch = _speed <= bankSpeedKnee ? Mathf.Lerp(-21f, -14f, Mathf.InverseLerp(0f, bankSpeedKnee, _speed)) : Mathf.Lerp(-14f, 6f, Mathf.InverseLerp(bankSpeedKnee, 250f, _speed));
+        float bankGearPitch = _gear <= 4 ? _gear * 1.5f : _gear == 5 ? 8.25f : 9.75f;
         return target - bankSpeedPitch - bankGearPitch;
     }
 
@@ -409,7 +418,7 @@ public class DriveSound : MonoBehaviour
 
         // 発火後に回転が下がっても音源の余韻は保持時間まで残す
         // 値1は既存音源の再生範囲外なので範囲の中央へ送る
-        SendSoundParameter("BACKTURBIN", m_backTurbinRemaining > 0f ? BackTurbinTriggerValue : 0f);
+        SendSoundParameter("BACKTURBIN", m_backTurbinRemaining > 0f ? m_backTurbinTriggerValue : 0f);
         m_backTurbinRemaining = Mathf.Max(0f, m_backTurbinRemaining - Time.deltaTime);
         // 踏み直しでは実過給圧を変えず音だけ低い音程から立ち上げ直す
         if (!released && m_previousSoundReleased)
@@ -485,68 +494,68 @@ public class DriveSound : MonoBehaviour
 
     void SetEngineBreakSound()
     {
-        float EngineBreak_vol = m_EngineBreak;
+        float engineBreakVol = m_engineBreak;
         if (m_vehicle.EngineRPM < 3000f)
         {
-            EngineBreak_vol = 0f;
+            engineBreakVol = 0f;
         }
 
-        m_driveEvent.setParameterByName("ENGINEBREAK", EngineBreak_vol);
+        m_driveEvent.setParameterByName("ENGINEBREAK", engineBreakVol);
         // 次の変速まで減衰値が負へ増え続けないよう音量範囲へ収める
-        m_EngineBreak = Mathf.Max(0f, m_EngineBreak - Time.deltaTime * m_EG_DampingRatio);
+        m_engineBreak = Mathf.Max(0f, m_engineBreak - Time.deltaTime * m_egDampingRatio);
     }
 
     // 部品ごとの音量調整
     void SetVolume()
     {
-        m_UpdateTime += Time.deltaTime;
-        if (m_UpdateInterval > m_UpdateTime)
+        m_updateTime += Time.deltaTime;
+        if (m_updateInterval > m_updateTime)
         {
             return;
         }
 
-        m_UpdateTime = 0.0f;
+        m_updateTime = 0.0f;
         // 変更がある場合パラメータを更新
-        if (m_RestEnginVolume != m_EngineVolume)
+        if (m_lastEngineVolume != m_engineVolume)
         {
-            m_driveEvent.setParameterByName("ENGINEVOL", m_EngineVolume);
-            m_RestEnginVolume = m_EngineVolume;
+            m_driveEvent.setParameterByName("ENGINEVOL", m_engineVolume);
+            m_lastEngineVolume = m_engineVolume;
         }
 
-        if (m_RestMissionVolume != m_MissionVolume)
+        if (m_lastMissionVolume != m_missionVolume)
         {
-            m_driveEvent.setParameterByName("MISSIONVOL", m_MissionVolume);
-            m_RestMissionVolume = m_MissionVolume;
+            m_driveEvent.setParameterByName("MISSIONVOL", m_missionVolume);
+            m_lastMissionVolume = m_missionVolume;
         }
 
-        if (m_RestTurboVolume != m_TurboVolume)
+        if (m_lastTurboVolume != m_turboVolume)
         {
-            m_driveEvent.setParameterByName("TURBOVOL", m_TurboVolume);
-            m_RestTurboVolume = m_TurboVolume;
+            m_driveEvent.setParameterByName("TURBOVOL", m_turboVolume);
+            m_lastTurboVolume = m_turboVolume;
         }
 
-        if (m_RestRoadVolume != m_RoadVolume)
+        if (m_lastRoadVolume != m_roadVolume)
         {
-            m_driveEvent.setParameterByName("ROADVOL", m_RoadVolume);
-            m_RestRoadVolume = m_RoadVolume;
+            m_driveEvent.setParameterByName("ROADVOL", m_roadVolume);
+            m_lastRoadVolume = m_roadVolume;
         }
 
-        if (m_RestGearUpVolume != m_GearUpVolume)
+        if (m_lastGearUpVolume != m_gearUpVolume)
         {
-            m_driveEvent.setParameterByName("GEARUPVOL", m_GearUpVolume);
-            m_RestGearUpVolume = m_GearUpVolume;
+            m_driveEvent.setParameterByName("GEARUPVOL", m_gearUpVolume);
+            m_lastGearUpVolume = m_gearUpVolume;
         }
 
-        if (m_RestGearDownVolume != m_GearDownVolume)
+        if (m_lastGearDownVolume != m_gearDownVolume)
         {
-            m_driveEvent.setParameterByName("GEARDOWNVOL", m_GearDownVolume);
-            m_RestGearDownVolume = m_GearDownVolume;
+            m_driveEvent.setParameterByName("GEARDOWNVOL", m_gearDownVolume);
+            m_lastGearDownVolume = m_gearDownVolume;
         }
 
-        if (m_RestBreakVolume != m_BreakVolume)
+        if (m_lastBrakeVolume != m_brakeVolume)
         {
-            m_driveEvent.setParameterByName("BREAKVOL", m_BreakVolume);
-            m_RestBreakVolume = m_BreakVolume;
+            m_driveEvent.setParameterByName("BREAKVOL", m_brakeVolume);
+            m_lastBrakeVolume = m_brakeVolume;
         }
     }
 
@@ -581,70 +590,70 @@ public class DriveSound : MonoBehaviour
 internal sealed class BackTurbinGain : System.IDisposable
 {
     // 既存バンクのバックタービン音以外へ音量補正を掛けないための識別名
-    readonly string sourceName;
+    readonly string m_sourceName;
     // 既存のバックタービン検査との互換性を維持するコンストラクター
     public BackTurbinGain() : this("ya_front_off_turbo_bov_only")
     {
     }
 
     // 単独音源の名前を指定して別の音へ補正しないためのコンストラクター
-    public BackTurbinGain(string name)
+    public BackTurbinGain(string _name)
     {
-        sourceName = name;
+        m_sourceName = _name;
     }
 
     // 補正器を取り外すための再生チャンネルと補正器の参照
-    FMOD.Channel channel;
-    FMOD.DSP gain;
+    FMOD.Channel m_channel;
+    FMOD.DSP m_gain;
     // 音源の生成と終了を追跡して専用音だけへ音量差を適用する関数
-    public void Tick(FMOD.Studio.EventInstance sound, float decibels)
+    public void Tick(FMOD.Studio.EventInstance _sound, float _decibels)
     {
-        if (gain.hasHandle() && !Matches(channel))
+        if (m_gain.hasHandle() && !Matches(m_channel))
         {
             Dispose();
         }
 
-        if (!gain.hasHandle())
+        if (!m_gain.hasHandle())
         {
-            if (sound.getChannelGroup(out var root) != FMOD.RESULT.OK || !Find(root, 0, out channel))
+            if (_sound.getChannelGroup(out var root) != FMOD.RESULT.OK || !Find(root, 0, out m_channel))
             {
                 return;
             }
 
-            if (channel.getSystemObject(out var core) != FMOD.RESULT.OK)
+            if (m_channel.getSystemObject(out var core) != FMOD.RESULT.OK)
             {
                 return;
             }
 
-            if (core.createDSPByType(FMOD.DSP_TYPE.FADER, out gain) != FMOD.RESULT.OK)
+            if (core.createDSPByType(FMOD.DSP_TYPE.FADER, out m_gain) != FMOD.RESULT.OK)
             {
                 return;
             }
 
             // 接続前に音量を設定して一瞬だけ未補正の値を通すことを避ける
-            gain.setParameterFloat((int)FMOD.DSP_FADER.GAIN, Mathf.Clamp(decibels, 0f, 18f));
-            if (channel.addDSP(FMOD.CHANNELCONTROL_DSP_INDEX.TAIL, gain) != FMOD.RESULT.OK)
+            m_gain.setParameterFloat((int)FMOD.DSP_FADER.GAIN, Mathf.Clamp(_decibels, 0f, 18f));
+            if (m_channel.addDSP(FMOD.CHANNELCONTROL_DSP_INDEX.TAIL, m_gain) != FMOD.RESULT.OK)
             {
                 Dispose();
                 return;
             }
         }
 
-        if (gain.setParameterFloat((int)FMOD.DSP_FADER.GAIN, Mathf.Clamp(decibels, 0f, 18f)) != FMOD.RESULT.OK)
+        if (m_gain.setParameterFloat((int)FMOD.DSP_FADER.GAIN, Mathf.Clamp(_decibels, 0f, 18f)) != FMOD.RESULT.OK)
         {
             Dispose();
         }
     }
 
     // チャンネルが別の音へ再利用されていないことを確認する関数
-    bool Matches(FMOD.Channel candidate)
+    bool Matches(FMOD.Channel _candidate)
     {
-        if (candidate.isPlaying(out bool playing) != FMOD.RESULT.OK || !playing)
+        if (_candidate.isPlaying(out bool playing) != FMOD.RESULT.OK || !playing)
         {
             return false;
         }
 
-        if (candidate.getCurrentSound(out var source) != FMOD.RESULT.OK)
+        if (_candidate.getCurrentSound(out var source) != FMOD.RESULT.OK)
         {
             return false;
         }
@@ -654,40 +663,40 @@ internal sealed class BackTurbinGain : System.IDisposable
             return false;
         }
 
-        return System.IO.Path.GetFileNameWithoutExtension(name).Equals(sourceName, System.StringComparison.OrdinalIgnoreCase);
+        return System.IO.Path.GetFileNameWithoutExtension(name).Equals(m_sourceName, System.StringComparison.OrdinalIgnoreCase);
     }
 
     // Driveイベントの範囲内から対象の単独音源を探す関数
-    bool Find(FMOD.ChannelGroup group, int depth, out FMOD.Channel result)
+    bool Find(FMOD.ChannelGroup _group, int _depth, out FMOD.Channel _result)
     {
-        result = default;
-        if (depth > 16)
+        _result = default;
+        if (_depth > 16)
         {
             return false;
         }
 
-        if (group.getNumChannels(out int count) == FMOD.RESULT.OK)
+        if (_group.getNumChannels(out int count) == FMOD.RESULT.OK)
         {
             for (int i = 0; i < count; i++)
             {
-                if (group.getChannel(i, out var candidate) != FMOD.RESULT.OK || !Matches(candidate))
+                if (_group.getChannel(i, out var candidate) != FMOD.RESULT.OK || !Matches(candidate))
                 {
                     continue;
                 }
 
-                result = candidate;
+                _result = candidate;
                 return true;
             }
         }
 
-        if (group.getNumGroups(out int children) != FMOD.RESULT.OK)
+        if (_group.getNumGroups(out int children) != FMOD.RESULT.OK)
         {
             return false;
         }
 
         for (int i = 0; i < children; i++)
         {
-            if (group.getGroup(i, out var child) == FMOD.RESULT.OK && Find(child, depth + 1, out result))
+            if (_group.getGroup(i, out var child) == FMOD.RESULT.OK && Find(child, _depth + 1, out _result))
             {
                 return true;
             }
@@ -699,14 +708,14 @@ internal sealed class BackTurbinGain : System.IDisposable
     // シーン終了と音源終了時に追加した補正器だけを解放する関数
     public void Dispose()
     {
-        if (!gain.hasHandle())
+        if (!m_gain.hasHandle())
         {
             return;
         }
 
-        channel.removeDSP(gain);
-        gain.release();
-        gain.clearHandle();
+        m_channel.removeDSP(m_gain);
+        m_gain.release();
+        m_gain.clearHandle();
     }
 }
 
@@ -716,18 +725,18 @@ internal sealed class CountdownRevIsolation : System.IDisposable
     // この制御が変更したグループだけ元の消音状態へ戻すための記録
     readonly System.Collections.Generic.Dictionary<FMOD.ChannelGroup, bool> m_previousMute = new();
     // 不正な音声階層を深く探索し続けないための上限
-    const int MaximumDepth = 16;
+    const int m_maximumDepth = 16;
     // 専用音が接続できた場合だけ通常駆動音を抑える関数
-    public void Tick(FMOD.Studio.EventInstance sound, bool active)
+    public void Tick(FMOD.Studio.EventInstance _sound, bool _active)
     {
         // アクセル解除や上限からの復帰では同じフレームで通常の音へ戻す
-        if (!active)
+        if (!_active)
         {
             Dispose();
             return;
         }
 
-        if (!sound.isValid() || sound.getChannelGroup(out var root) != FMOD.RESULT.OK)
+        if (!_sound.isValid() || _sound.getChannelGroup(out var root) != FMOD.RESULT.OK)
         {
             Dispose();
             return;
@@ -744,19 +753,19 @@ internal sealed class CountdownRevIsolation : System.IDisposable
     }
 
     // ビルドでグループ名が失われても録音済みレブ音の名前で再生先を識別する関数
-    public static bool ContainsRevSource(FMOD.ChannelGroup group, int depth)
+    public static bool ContainsRevSource(FMOD.ChannelGroup _group, int _depth)
     {
-        if (depth > MaximumDepth)
+        if (_depth > m_maximumDepth)
         {
             return false;
         }
 
         // FMODバンク内に保存された専用音源だけを選び通常エンジン音と区別する
-        if (group.getNumChannels(out int channels) == FMOD.RESULT.OK)
+        if (_group.getNumChannels(out int channels) == FMOD.RESULT.OK)
         {
             for (int i = 0; i < channels; i++)
             {
-                if (group.getChannel(i, out var channel) != FMOD.RESULT.OK)
+                if (_group.getChannel(i, out var channel) != FMOD.RESULT.OK)
                 {
                     continue;
                 }
@@ -778,7 +787,7 @@ internal sealed class CountdownRevIsolation : System.IDisposable
             }
         }
 
-        if (group.getNumGroups(out int count) != FMOD.RESULT.OK)
+        if (_group.getNumGroups(out int count) != FMOD.RESULT.OK)
         {
             return false;
         }
@@ -786,7 +795,7 @@ internal sealed class CountdownRevIsolation : System.IDisposable
         // 親イベント以外へ探索を広げず他車やUIの音へ影響させない
         for (int i = 0; i < count; i++)
         {
-            if (group.getGroup(i, out var child) == FMOD.RESULT.OK && ContainsRevSource(child, depth + 1))
+            if (_group.getGroup(i, out var child) == FMOD.RESULT.OK && ContainsRevSource(child, _depth + 1))
             {
                 return true;
             }
@@ -796,14 +805,14 @@ internal sealed class CountdownRevIsolation : System.IDisposable
     }
 
     // レブ音へ通じる枝を残し同じDriveイベント内の他の枝だけ消音する関数
-    void MuteDrivingGroups(FMOD.ChannelGroup group, int depth)
+    void MuteDrivingGroups(FMOD.ChannelGroup _group, int _depth)
     {
-        if (depth > MaximumDepth)
+        if (_depth > m_maximumDepth)
         {
             return;
         }
 
-        if (group.getNumGroups(out int count) != FMOD.RESULT.OK)
+        if (_group.getNumGroups(out int count) != FMOD.RESULT.OK)
         {
             return;
         }
@@ -811,12 +820,12 @@ internal sealed class CountdownRevIsolation : System.IDisposable
         // 遅れて生成された音声グループも次フレームで消音へ含める
         for (int i = 0; i < count; i++)
         {
-            if (group.getGroup(i, out var child) != FMOD.RESULT.OK)
+            if (_group.getGroup(i, out var child) != FMOD.RESULT.OK)
             {
                 continue;
             }
 
-            if (ContainsRevSource(child, depth + 1))
+            if (ContainsRevSource(child, _depth + 1))
             {
                 // 再生先が再生成された時に以前の消音状態をレブ音へ残さない
                 if (m_previousMute.TryGetValue(child, out bool previous))
@@ -825,7 +834,7 @@ internal sealed class CountdownRevIsolation : System.IDisposable
                     m_previousMute.Remove(child);
                 }
 
-                MuteDrivingGroups(child, depth + 1);
+                MuteDrivingGroups(child, _depth + 1);
             }
             else
             {

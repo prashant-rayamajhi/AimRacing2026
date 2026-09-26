@@ -43,7 +43,7 @@ public partial class VehicleController
     // 停車や空中や壁接触中に旋回演出を重ねないための関数
     bool CanApplyModeHandling()
     {
-        if (!m_modeYawAssistEnabled || !m_escEnabled || m_IsPullUp || m_rigidbody == null || m_mission == null)
+        if (!m_modeYawAssistEnabled || !m_escEnabled || m_isPullUp || m_rigidbody == null || m_mission == null)
         {
             return false;
         }
@@ -62,7 +62,7 @@ public partial class VehicleController
     }
 
     // 旋回中に許す滑り幅を求め限界内ではタイヤの自然な追従を残す関数
-    void UpdateModeSlipAllowance(float baseYawRate, Vector3 localVelocity, float gripLimit)
+    void UpdateModeSlipAllowance(float _baseYawRate, Vector3 _localVelocity, float _gripLimit)
     {
         m_handlingTargetSlipDegrees = 0f;
         // Trackの復帰判定をESCとヨー補助の両方で同じ物理更新から使う
@@ -75,8 +75,8 @@ public partial class VehicleController
         // 直進では滑りを作らず旋回時だけモードの後輪追従量を使う
         float sport = m_differential.SportHandlingBlend;
         float track = m_differential.TrackHandlingBlend;
-        float speedBlend = Mathf.InverseLerp(m_modeHandlingStartKph, m_modeHandlingFullKph, localVelocity.z * 3.6f);
-        float turnDemand = Mathf.Clamp(baseYawRate / Mathf.Max(0.01f, gripLimit), -1f, 1f);
+        float speedBlend = Mathf.InverseLerp(m_modeHandlingStartKph, m_modeHandlingFullKph, _localVelocity.z * 3.6f);
+        float turnDemand = Mathf.Clamp(_baseYawRate / Mathf.Max(0.01f, _gripLimit), -1f, 1f);
         m_handlingTargetSlipDegrees = -turnDemand * speedBlend * (sport * m_sportTargetSlipDegrees + track * m_trackTargetSlipDegrees);
     }
 

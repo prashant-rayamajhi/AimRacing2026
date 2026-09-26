@@ -13,7 +13,7 @@ public partial class VehicleController
     // UIの開始判定へ渡す回転数
     public float CountdownMinimumRPM => m_countdownMinimumRPM;
     // 描画の間にリミッターから回転が下がっても全開で開始回転へ達したことを判定する
-    public bool CountdownReady => m_engine != null && m_IsPullUp && m_accelInput >= 0.99f && (m_engine.RPM >= CountdownMinimumRPM || (m_engine.RevLimiterCut && m_engine.TemporaryRevLimitRPM >= CountdownMinimumRPM));
+    public bool CountdownReady => m_engine != null && m_isPullUp && m_accelInput >= 0.99f && (m_engine.RPM >= CountdownMinimumRPM || (m_engine.RevLimiterCut && m_engine.TemporaryRevLimitRPM >= CountdownMinimumRPM));
     // 待機専用の上限を通常走行のレブリミット以内に収める回転数
     public float CountdownMaximumRPM => Mathf.Min(m_engine.OverRevRPM, CountdownMinimumRPM + Mathf.Clamp(m_countdownRPMMargin, 0f, 1000f));
 
@@ -38,7 +38,7 @@ public partial class VehicleController
     // カウントダウン開始時に1速を選びクラッチを切ったまま回転制限を開始する関数
     public void BeginCountdownLaunch()
     {
-        if (m_engine == null || m_mission == null || !m_IsPullUp)
+        if (m_engine == null || m_mission == null || !m_isPullUp)
         {
             return;
         }
@@ -65,7 +65,7 @@ public partial class VehicleController
 
         // この時点では回転を飛ばさず、次の物理更新から少しずつ低下させる
         m_launchStartRPM = m_engine.RPM;
-        m_launchRetainedRPM = Mathf.Max(m_engine.IdleAngularVelocity * CarPhysics.Rad2RPM, CountdownMaximumRPM - m_launchRPMDrop);
+        m_launchRetainedRPM = Mathf.Max(m_engine.IdleAngularVelocity * CarPhysics.m_radiansToRpm, CountdownMaximumRPM - m_launchRPMDrop);
         m_launchElapsed = 0f;
         m_countdownLaunchActive = false;
         m_launchRPMBlendRemaining = Mathf.Max(m_launchRPMBlendSeconds, m_launchMaximumAssistSeconds);
@@ -80,7 +80,7 @@ public partial class VehicleController
             return;
         }
 
-        if (m_IsPullUp)
+        if (m_isPullUp)
         {
             // カウント中だけ制限しアクセルを離した時の自然な回転低下は残す
             m_engine.SetLaunchRPM(Mathf.Min(m_engine.RPM, CountdownMaximumRPM));
@@ -93,7 +93,7 @@ public partial class VehicleController
         }
 
         // ブレーキ中やアクセルを離した時は回転維持の補助を解除する
-        if (m_accelInput <= 0.03f || m_brakeInput > 0.01f || m_IsPullUp)
+        if (m_accelInput <= 0.03f || m_brakeInput > 0.01f || m_isPullUp)
         {
             m_launchRPMBlendRemaining = 0f;
             return;
@@ -118,7 +118,7 @@ public partial class VehicleController
         {
             // 駆動軸が発進回転へ追いついたら通常同期へ戻し、その後のAT変速条件は変えない
             float shaftRPM = m_wheelController != null ? Mathf.Abs(m_wheelController.ShaftAngularVelocity * m_mission.CurrentGearRatio) : 0f;
-            shaftRPM *= CarPhysics.Rad2RPM;
+            shaftRPM *= CarPhysics.m_radiansToRpm;
             if (shaftRPM >= m_launchRetainedRPM)
             {
                 m_launchRPMBlendRemaining = 0f;

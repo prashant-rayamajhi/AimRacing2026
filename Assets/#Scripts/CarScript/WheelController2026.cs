@@ -5,17 +5,22 @@ using UnityEngine;
 public partial class WheelController2026 : MonoBehaviour
 {
     // WheelColliderのリストは、前輪右、前輪左、後輪右、後輪左の順で設定する。
+    [UnityEngine.Serialization.FormerlySerializedAs("m_Wheels")]
     [Header("Wheels (FR, FL, RR, RL)")]
     [SerializeField]
-    List<WheelCollider> m_Wheels = new List<WheelCollider>();
+    List<WheelCollider> m_wheels = new List<WheelCollider>();
+    [UnityEngine.Serialization.FormerlySerializedAs("m_WheelVisuals")]
     [SerializeField]
-    List<Transform> m_WheelVisuals = new List<Transform>();
+    List<Transform> m_wheelVisuals = new List<Transform>();
+    [UnityEngine.Serialization.FormerlySerializedAs("m_IsDrive")]
     [SerializeField]
-    List<bool> m_IsDrive = new List<bool>();
+    List<bool> m_isDrive = new List<bool>();
+    [UnityEngine.Serialization.FormerlySerializedAs("m_IsFront")]
     [SerializeField]
-    List<bool> m_IsFront = new List<bool>();
+    List<bool> m_isFront = new List<bool>();
+    [UnityEngine.Serialization.FormerlySerializedAs("m_IsRight")]
     [SerializeField]
-    List<bool> m_IsRight = new List<bool>();
+    List<bool> m_isRight = new List<bool>();
     // 車両の駆動、制動、操舵を担当するコンポーネントを参照する。
     [Header("Vehicle Parts")]
     [SerializeField]
@@ -153,19 +158,19 @@ public partial class WheelController2026 : MonoBehaviour
     bool m_isAirborne;
     bool m_initialVisualPoseReady;
     // プロパティでWheelColliderの数、シャフト回転数、ABS作動状態を取得する
-    public int WheelCount => m_Wheels != null ? m_Wheels.Count : 0;
+    public int WheelCount => m_wheels != null ? m_wheels.Count : 0;
     // 後退速度の計算に使用する現在のタイヤ半径
     public float WheelRadius => m_wheelRadius;
 
     // タイヤ音が現在の横摩擦曲線に対応するよう最大横力の滑り量を返す関数
-    public float GetSidewaysPeakSlip(int index)
+    public float GetSidewaysPeakSlip(int _index)
     {
-        if (index < 0 || index >= m_Wheels.Count || m_Wheels[index] == null)
+        if (_index < 0 || _index >= m_wheels.Count || m_wheels[_index] == null)
         {
             return 0.14f;
         }
 
-        return Mathf.Max(0.001f, m_Wheels[index].sidewaysFriction.extremumSlip);
+        return Mathf.Max(0.001f, m_wheels[_index].sidewaysFriction.extremumSlip);
     }
 
     public float ShaftAngularVelocity => m_shaftAngularVelocity;
@@ -175,9 +180,9 @@ public partial class WheelController2026 : MonoBehaviour
     public float AirborneTime => m_ungroundedTime;
 
     // 指定した車輪のABS制動圧を返す関数
-    public float GetABSPressure(int index)
+    public float GetABSPressure(int _index)
     {
-        return index >= 0 && index < m_absPressure.Length ? m_absPressure[index] : 1f;
+        return _index >= 0 && _index < m_absPressure.Length ? m_absPressure[_index] : 1f;
     }
 
     public bool AnyABSActive
@@ -209,11 +214,11 @@ public partial class WheelController2026 : MonoBehaviour
     }
 
     // VehicleControllerが自動取得したデフ、ブレーキ、ステアリングを設定する関数
-    public void ConfigureVehicleParts(Differential differential, Brake brake, Steering steering)
+    public void ConfigureVehicleParts(Differential _differential, Brake _brake, Steering _steering)
     {
-        m_differential = differential;
-        m_brake = brake;
-        m_steering = steering;
+        m_differential = _differential;
+        m_brake = _brake;
+        m_steering = _steering;
         if (m_vehicleRigidbody == null)
         {
             m_vehicleRigidbody = GetComponentInParent<Rigidbody>();
@@ -228,7 +233,7 @@ public partial class WheelController2026 : MonoBehaviour
     // 未設定の場合だけ車両階層の4輪を前右、前左、後右、後左の順へ自動登録する関数
     void ResolveWheelColliders()
     {
-        if (m_Wheels != null && m_Wheels.Count == 4 && m_Wheels.TrueForAll(wheel => wheel != null))
+        if (m_wheels != null && m_wheels.Count == 4 && m_wheels.TrueForAll(_wheel => _wheel != null))
         {
             return;
         }
@@ -245,15 +250,15 @@ public partial class WheelController2026 : MonoBehaviour
         }
 
         Transform reference = m_vehicleRigidbody != null ? m_vehicleRigidbody.transform : transform;
-        System.Array.Sort(wheels, (left, right) => CompareWheelPosition(reference, left.transform, right.transform));
-        m_Wheels = new List<WheelCollider>(wheels);
+        System.Array.Sort(wheels, (_left, _right) => CompareWheelPosition(reference, _left.transform, _right.transform));
+        m_wheels = new List<WheelCollider>(wheels);
     }
 
     // 車輪を前後位置の降順、同じ車軸では左右位置の降順に並べる関数
-    int CompareWheelPosition(Transform reference, Transform left, Transform right)
+    int CompareWheelPosition(Transform _reference, Transform _left, Transform _right)
     {
-        Vector3 leftPosition = reference.InverseTransformPoint(left.position);
-        Vector3 rightPosition = reference.InverseTransformPoint(right.position);
+        Vector3 leftPosition = _reference.InverseTransformPoint(_left.position);
+        Vector3 rightPosition = _reference.InverseTransformPoint(_right.position);
         if (!Mathf.Approximately(leftPosition.z, rightPosition.z))
         {
             return rightPosition.z.CompareTo(leftPosition.z);
@@ -273,11 +278,11 @@ public partial class WheelController2026 : MonoBehaviour
     }
 
     // VehicleControllerからESCの駆動抑制と選択制動を受け取る。
-    public void SetStabilityControl(float torqueFactor, int brakeWheelIndex, float brakeTorque)
+    public void SetStabilityControl(float _torqueFactor, int _brakeWheelIndex, float _brakeTorque)
     {
-        m_stabilityTorqueFactor = Mathf.Clamp01(torqueFactor);
-        m_stabilityBrakeWheel = brakeWheelIndex;
-        m_stabilityBrakeTorque = Mathf.Max(0f, brakeTorque);
+        m_stabilityTorqueFactor = Mathf.Clamp01(_torqueFactor);
+        m_stabilityBrakeWheel = _brakeWheelIndex;
+        m_stabilityBrakeTorque = Mathf.Max(0f, _brakeTorque);
     }
 
     // 駆動、制動、操舵を4輪へ反映し、シャフト回転数を更新する。
@@ -297,30 +302,30 @@ public partial class WheelController2026 : MonoBehaviour
         float currentShaftVelocity = 0f;
         int drivenWheelCount = 0;
         // 全輪の同じ物理ステップの回転数を揃え、計算順でデフの配分が変わらないようにする
-        for (int i = 0; i < m_Wheels.Count; i++)
+        for (int i = 0; i < m_wheels.Count; i++)
         {
-            if (!m_IsDrive[i])
+            if (!m_isDrive[i])
             {
                 continue;
             }
 
             // 駆動輪の回転数と慣性をデフへ渡してから四輪のトルクを求める
-            WheelCollider wheel = m_Wheels[i];
+            WheelCollider wheel = m_wheels[i];
             float angularVelocity = wheel.rpm * Mathf.PI * 2f / 60f;
             float inertia = 0.5f * wheel.mass * wheel.radius * wheel.radius;
-            currentShaftVelocity = m_differential.GetShaftVelocity(angularVelocity, inertia, m_IsFront[i], m_IsRight[i]);
+            currentShaftVelocity = m_differential.GetShaftVelocity(angularVelocity, inertia, m_isFront[i], m_isRight[i]);
             drivenWheelCount++;
         }
 
         // モードの補間はVehicleControllerで操舵より先に一度だけ更新する
         // 各WheelColliderに駆動トルク、制動トルク、操舵角を設定する
-        for (int i = 0; i < m_Wheels.Count; i++)
+        for (int i = 0; i < m_wheels.Count; i++)
         {
-            WheelCollider wheel = m_Wheels[i];
+            WheelCollider wheel = m_wheels[i];
             bool grounded = wheel.GetGroundHit(out WheelHit hit);
             // 基準値から毎回計算しモード往復で摩擦倍率が累積しないようにする
-            float track = m_IsFront[i] ? 0f : m_differential.TrackHandlingBlend;
-            float sport = m_IsFront[i] ? 0f : m_differential.SportHandlingBlend;
+            float track = m_isFront[i] ? 0f : m_differential.TrackHandlingBlend;
+            float sport = m_isFront[i] ? 0f : m_differential.SportHandlingBlend;
             WheelFrictionCurve lateral = wheel.sidewaysFriction;
             const float peakSlip = 0.14f;
             const float slidingSlip = 0.40f;
@@ -344,11 +349,11 @@ public partial class WheelController2026 : MonoBehaviour
             }
 
             // 駆動輪の場合は、差動装置から駆動トルクを取得する。非駆動輪は0にする。
-            float driveTorque = m_IsDrive[i] ? m_differential.GetDriveTorque(m_IsFront[i], m_IsRight[i]) : 0f;
+            float driveTorque = m_isDrive[i] ? m_differential.GetDriveTorque(m_isFront[i], m_isRight[i]) : 0f;
             driveTorque *= m_stabilityTorqueFactor;
             // 制動時の滑りはABSに任せ、加速空転だけを駆動力制限の対象にする
             float accelerationSlip = GetAccelerationSlip(hit.forwardSlip);
-            if (grounded && m_IsDrive[i] && accelerationSlip > m_tractionSlipLimit)
+            if (grounded && m_isDrive[i] && accelerationSlip > m_tractionSlipLimit)
             {
                 float slipAmount = Mathf.InverseLerp(m_tractionSlipLimit, 0.8f, accelerationSlip);
                 float targetRatio = Mathf.Lerp(1f, m_minimumTractionTorqueRatio, slipAmount);
@@ -362,7 +367,7 @@ public partial class WheelController2026 : MonoBehaviour
 
             driveTorque *= grounded ? m_tractionTorqueRatio[i] : 0.12f;
             // 制動トルクはBrakeコンポーネントから取得する。ESCの選択制動がある場合は加算する。
-            float requestedBrake = m_brake.GetBrakeTorque(m_IsFront[i]);
+            float requestedBrake = m_brake.GetBrakeTorque(m_isFront[i]);
             if (i == m_stabilityBrakeWheel)
             {
                 requestedBrake += m_stabilityBrakeTorque;
@@ -390,7 +395,7 @@ public partial class WheelController2026 : MonoBehaviour
             wheel.motorTorque = reducingTorque ? driveTorque : Mathf.MoveTowards(wheel.motorTorque, driveTorque, m_motorTorqueApplyRate * Time.fixedDeltaTime);
             wheel.brakeTorque = CalculateABSBrakeTorque(i, wheel, grounded, hit, requestedBrake, vehicleSpeedKph);
             // サイドブレーキは後輪だけに掛け、通常ブレーキのABS制御と前輪制動を維持する
-            wheel.brakeTorque = Mathf.Max(wheel.brakeTorque, m_brake.GetHandbrakeTorque(m_IsFront[i]));
+            wheel.brakeTorque = Mathf.Max(wheel.brakeTorque, m_brake.GetHandbrakeTorque(m_isFront[i]));
             // サイドブレーキ中は四輪駆動が制動を押し切らないよう駆動を切る
             if (m_brake.HandbrakeActive)
             {
@@ -399,7 +404,7 @@ public partial class WheelController2026 : MonoBehaviour
 
             // Trackの加速ドリフトだけ後輪の横グリップを滑らかに配分する
             ApplyTrackPoweredGrip(i, wheel, grounded, hit);
-            wheel.steerAngle = m_IsFront[i] ? m_steering.CalcSteerAngle(m_IsRight[i]) : 0f;
+            wheel.steerAngle = m_isFront[i] ? m_steering.CalcSteerAngle(m_isRight[i]) : 0f;
         }
 
         // 前後の左右輪を連携させ、片輪だけが大きく沈んだ時の荷重差を車体へ戻す
@@ -417,20 +422,20 @@ public partial class WheelController2026 : MonoBehaviour
     }
 
     // 同じ車軸の左右サスペンション圧縮差からアンチロール力を加える関数
-    void ApplyAntiRollBar(int rightIndex, int leftIndex, float stiffness)
+    void ApplyAntiRollBar(int _rightIndex, int _leftIndex, float _stiffness)
     {
-        if (m_vehicleRigidbody == null || stiffness <= 0f)
+        if (m_vehicleRigidbody == null || _stiffness <= 0f)
         {
             return;
         }
 
-        if (rightIndex >= m_Wheels.Count || leftIndex >= m_Wheels.Count)
+        if (_rightIndex >= m_wheels.Count || _leftIndex >= m_wheels.Count)
         {
             return;
         }
 
-        WheelCollider rightWheel = m_Wheels[rightIndex];
-        WheelCollider leftWheel = m_Wheels[leftIndex];
+        WheelCollider rightWheel = m_wheels[_rightIndex];
+        WheelCollider leftWheel = m_wheels[_leftIndex];
         if (rightWheel == null || leftWheel == null)
         {
             return;
@@ -440,7 +445,7 @@ public partial class WheelController2026 : MonoBehaviour
         bool leftGrounded = leftWheel.GetGroundHit(out WheelHit leftHit);
         float rightTravel = GetSuspensionTravel(rightWheel, rightGrounded, rightHit);
         float leftTravel = GetSuspensionTravel(leftWheel, leftGrounded, leftHit);
-        float antiRollForce = (rightTravel - leftTravel) * stiffness;
+        float antiRollForce = (rightTravel - leftTravel) * _stiffness;
         // 縮んだ側を持ち上げ、伸びた側を押し下げて左右の圧縮差を減らす
         if (rightGrounded)
         {
@@ -454,25 +459,25 @@ public partial class WheelController2026 : MonoBehaviour
     }
 
     // 接地点からサスペンションの伸縮位置を0から1の範囲で求める関数
-    static float GetSuspensionTravel(WheelCollider wheel, bool grounded, WheelHit hit)
+    static float GetSuspensionTravel(WheelCollider _wheel, bool _grounded, WheelHit _hit)
     {
-        if (!grounded)
+        if (!_grounded)
         {
             return 0f;
         }
 
-        return GetSuspensionCompression(wheel);
+        return GetSuspensionCompression(_wheel);
     }
 
     // サスペンション圧縮が限界に近い時だけ段階的な補助力を車体へ加える関数
-    void ApplyBumpStop(WheelCollider wheel, WheelHit hit)
+    void ApplyBumpStop(WheelCollider _wheel, WheelHit _hit)
     {
         if (m_vehicleRigidbody == null || m_bumpStopMaximumForce <= 0f)
         {
             return;
         }
 
-        float compression = GetSuspensionCompression(wheel);
+        float compression = GetSuspensionCompression(_wheel);
         if (compression <= m_bumpStopStartCompression)
         {
             return;
@@ -482,60 +487,60 @@ public partial class WheelController2026 : MonoBehaviour
         float bumpStopForce = compressionRatio * compressionRatio * m_bumpStopMaximumForce;
         float hardCompressionRatio = Mathf.InverseLerp(m_hardBumpStopStartCompression, 1f, compression);
         bumpStopForce += hardCompressionRatio * hardCompressionRatio * hardCompressionRatio * m_hardBumpStopMaximumForce;
-        m_vehicleRigidbody.AddForceAtPosition(hit.normal * bumpStopForce, wheel.transform.position);
+        m_vehicleRigidbody.AddForceAtPosition(_hit.normal * bumpStopForce, _wheel.transform.position);
     }
 
     // ABSの作動状態を判定し、制動トルクを調整する
-    float CalculateABSBrakeTorque(int index, WheelCollider wheel, bool grounded, WheelHit hit, float requestedBrake, float speedKph)
+    float CalculateABSBrakeTorque(int _index, WheelCollider _wheel, bool _grounded, WheelHit _hit, float _requestedBrake, float _speedKph)
     {
         // 制動トルクが0以下の場合はABSを作動させず、制動圧力を1にする
-        requestedBrake = Mathf.Max(0f, requestedBrake);
-        if (requestedBrake <= 0.01f)
+        _requestedBrake = Mathf.Max(0f, _requestedBrake);
+        if (_requestedBrake <= 0.01f)
         {
-            m_absPressure[index] = 1f;
-            m_absActive[index] = false;
+            m_absPressure[_index] = 1f;
+            m_absActive[_index] = false;
             return 0f;
         }
 
         // 制動時に荷重が抜けた車輪へ静止荷重分のブレーキを掛けないよう接地荷重で上限を求める
-        float sprungLoad = Mathf.Max(1f, wheel.sprungMass) * Physics.gravity.magnitude;
-        float supportedLoad = grounded ? Mathf.Max(0f, hit.force) : sprungLoad;
-        float gripLimitedBrake = supportedLoad * wheel.radius * m_brakeGripCoefficient;
-        float limitedBrake = Mathf.Min(requestedBrake, gripLimitedBrake);
+        float sprungLoad = Mathf.Max(1f, _wheel.sprungMass) * Physics.gravity.magnitude;
+        float supportedLoad = _grounded ? Mathf.Max(0f, _hit.force) : sprungLoad;
+        float gripLimitedBrake = supportedLoad * _wheel.radius * m_brakeGripCoefficient;
+        float limitedBrake = Mathf.Min(_requestedBrake, gripLimitedBrake);
         // ABSを無効にした時と空中では制動圧を初期化する
-        if (!m_absEnabled || !grounded)
+        if (!m_absEnabled || !_grounded)
         {
-            m_absPressure[index] = 1f;
-            m_absActive[index] = false;
+            m_absPressure[_index] = 1f;
+            m_absActive[_index] = false;
             return limitedBrake;
         }
 
         // 低速でABSを終える時も制動圧を徐々に戻し、停止直前の衝撃を抑える
-        if (speedKph < m_absMinimumSpeedKph)
+        if (_speedKph < m_absMinimumSpeedKph)
         {
-            m_absPressure[index] = Mathf.MoveTowards(m_absPressure[index], 1f, m_absApplyRate * m_absReleaseSlip * Time.fixedDeltaTime);
-            m_absActive[index] = m_absPressure[index] < 0.999f;
-            return limitedBrake * m_absPressure[index];
+            m_absPressure[_index] = Mathf.MoveTowards(m_absPressure[_index], 1f, m_absApplyRate * m_absReleaseSlip * Time.fixedDeltaTime);
+            m_absActive[_index] = m_absPressure[_index] < 0.999f;
+            return limitedBrake * m_absPressure[_index];
         }
 
         // Unityの正の前後スリップだけが制動スリップなので加速空転を減圧の原因にしない
-        float brakingSlip = Mathf.Max(0f, hit.forwardSlip);
+        float brakingSlip = Mathf.Max(0f, _hit.forwardSlip);
         if (brakingSlip >= m_absLockSlip)
         {
             // ロックが強い時ほど速く減圧し、境界付近で制動力を大きく切り替えない
             float releaseAmount = m_absReleaseRate * Mathf.Clamp01(brakingSlip - m_absReleaseSlip) * Time.fixedDeltaTime;
-            m_absPressure[index] = Mathf.MoveTowards(m_absPressure[index], m_absMinimumPressure, releaseAmount);
+            m_absPressure[_index] = Mathf.MoveTowards(m_absPressure[_index], m_absMinimumPressure, releaseAmount);
         }
         else if (brakingSlip <= m_absReleaseSlip)
         {
             // 回復したグリップの余裕に応じて再加圧し、再ロックと車体の前後揺れを抑える
             float applyAmount = m_absApplyRate * (m_absReleaseSlip - brakingSlip) * Time.fixedDeltaTime;
-            m_absPressure[index] = Mathf.MoveTowards(m_absPressure[index], 1f, applyAmount);
+            m_absPressure[_index] = Mathf.MoveTowards(m_absPressure[_index], 1f, applyAmount);
         }
 
         // ABSの作動状態を更新する
-        m_absActive[index] = m_absPressure[index] < 0.999f;
-        return limitedBrake * m_absPressure[index];
+        m_absActive[_index] = m_absPressure[_index] < 0.999f;
+        return limitedBrake * m_absPressure[_index];
     }
 
     // WheelColliderの位置と回転を、表示用タイヤのTransformに反映する
@@ -549,18 +554,18 @@ public partial class WheelController2026 : MonoBehaviour
 
         m_initialVisualPoseReady = true;
         // GetWorldPoseを使わないとWheelColliderだけが回転し、画面上のタイヤが静止したままになる
-        int count = Mathf.Min(m_Wheels.Count, m_WheelVisuals.Count);
+        int count = Mathf.Min(m_wheels.Count, m_wheelVisuals.Count);
         // WheelColliderの位置と回転を、表示用タイヤのTransformに反映する
         for (int i = 0; i < count; i++)
         {
             // WheelColliderまたは表示用タイヤがnullの場合はスキップする
-            if (m_Wheels[i] == null || m_WheelVisuals[i] == null)
+            if (m_wheels[i] == null || m_wheelVisuals[i] == null)
             {
                 continue;
             }
 
             // WheelColliderからサスペンション、操舵、回転を含む車輪姿勢を取得する
-            WheelCollider wheel = m_Wheels[i];
+            WheelCollider wheel = m_wheels[i];
             wheel.GetWorldPose(out Vector3 position, out Quaternion wheelRotation);
             Quaternion rotation = wheelRotation * m_visualRotationOffsets[i];
             // 物理値が不正なフレームでタイヤと追従カメラへNaN座標を伝えないための処理
@@ -569,50 +574,50 @@ public partial class WheelController2026 : MonoBehaviour
                 continue;
             }
 
-            m_WheelVisuals[i].SetPositionAndRotation(position, rotation);
+            m_wheelVisuals[i].SetPositionAndRotation(position, rotation);
         }
     }
 
     // 座標の各成分がNaNまたは無限値ではないことを確認する関数
-    static bool IsFinite(Vector3 value)
+    static bool IsFinite(Vector3 _value)
     {
-        return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+        return IsFinite(_value.x) && IsFinite(_value.y) && IsFinite(_value.z);
     }
 
     // 回転の各成分がNaNまたは無限値ではないことを確認する関数
-    static bool IsFinite(Quaternion value)
+    static bool IsFinite(Quaternion _value)
     {
-        return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z) && IsFinite(value.w);
+        return IsFinite(_value.x) && IsFinite(_value.y) && IsFinite(_value.z) && IsFinite(_value.w);
     }
 
     // 単精度値がNaNまたは無限値ではないことを確認する関数
-    static bool IsFinite(float value)
+    static bool IsFinite(float _value)
     {
-        return !float.IsNaN(value) && !float.IsInfinity(value);
+        return !float.IsNaN(_value) && !float.IsInfinity(_value);
     }
 
     // WheelColliderが接地しているかどうかを返す
-    public bool IsGrounded(int index)
+    public bool IsGrounded(int _index)
     {
-        return index >= 0 && index < m_Wheels.Count && m_Wheels[index] != null && m_Wheels[index].isGrounded;
+        return _index >= 0 && _index < m_wheels.Count && m_wheels[_index] != null && m_wheels[_index].isGrounded;
     }
 
     // WheelColliderの回転数をrpmで返す
-    public float GetWheelRPM(int index)
+    public float GetWheelRPM(int _index)
     {
-        return index >= 0 && index < m_Wheels.Count && m_Wheels[index] != null ? m_Wheels[index].rpm : 0f;
+        return _index >= 0 && _index < m_wheels.Count && m_wheels[_index] != null ? m_wheels[_index].rpm : 0f;
     }
 
     // 荷重メーターへ指定車輪の接地力をニュートン単位で返す関数
-    public float GetContactLoad(int index)
+    public float GetContactLoad(int _index)
     {
         // 参照切れや空中では古い接地荷重を表示しない
-        if (m_Wheels == null || index < 0 || index >= m_Wheels.Count)
+        if (m_wheels == null || _index < 0 || _index >= m_wheels.Count)
         {
             return 0f;
         }
 
-        WheelCollider wheel = m_Wheels[index];
+        WheelCollider wheel = m_wheels[_index];
         if (wheel == null || !wheel.enabled || !wheel.gameObject.activeInHierarchy)
         {
             return 0f;
@@ -622,7 +627,7 @@ public partial class WheelController2026 : MonoBehaviour
     }
 
     // 接地している複数のタイヤから車体を支える路面の平均法線を返す関数
-    public bool TryGetSupportNormal(out Vector3 normal)
+    public bool TryGetSupportNormal(out Vector3 _normal)
     {
         // 片輪だけの接触や壁面を走行中の道路勾配と取り違えないための基準
         const int minimumSupportWheels = 2;
@@ -630,13 +635,13 @@ public partial class WheelController2026 : MonoBehaviour
         // 有効な接地面だけを平均して縁石など一輪の変化へ過敏に反応しない
         Vector3 normalSum = Vector3.zero;
         int supportCount = 0;
-        normal = Vector3.up;
-        if (m_Wheels == null)
+        _normal = Vector3.up;
+        if (m_wheels == null)
         {
             return false;
         }
 
-        foreach (WheelCollider wheel in m_Wheels)
+        foreach (WheelCollider wheel in m_wheels)
         {
             if (wheel == null || !wheel.enabled || !wheel.gameObject.activeInHierarchy)
             {
@@ -657,43 +662,43 @@ public partial class WheelController2026 : MonoBehaviour
             return false;
         }
 
-        normal = normalSum.normalized;
+        _normal = normalSum.normalized;
         return true;
     }
 
     // 指定したタイヤの前後スリップ量を返す
-    public float GetForwardSlip(int index)
+    public float GetForwardSlip(int _index)
     {
-        return index >= 0 && index < m_forwardSlip.Length ? m_forwardSlip[index] : 0f;
+        return _index >= 0 && _index < m_forwardSlip.Length ? m_forwardSlip[_index] : 0f;
     }
 
     // 指定したタイヤの横スリップ量を返す
-    public float GetSidewaysSlip(int index)
+    public float GetSidewaysSlip(int _index)
     {
-        return index >= 0 && index < m_sidewaysSlip.Length ? m_sidewaysSlip[index] : 0f;
+        return _index >= 0 && _index < m_sidewaysSlip.Length ? m_sidewaysSlip[_index] : 0f;
     }
 
     // 指定した車輪の表示用タイヤが設定されているか返す関数
-    public bool HasWheelVisual(int index)
+    public bool HasWheelVisual(int _index)
     {
-        return index >= 0 && index < m_WheelVisuals.Count && m_WheelVisuals[index] != null;
+        return _index >= 0 && _index < m_wheelVisuals.Count && m_wheelVisuals[_index] != null;
     }
 
     // 表示用タイヤとWheelColliderのサスペンション位置の誤差を返す関数
-    public float GetVisualPoseError(int index)
+    public float GetVisualPoseError(int _index)
     {
-        if (index < 0 || index >= m_Wheels.Count || index >= m_WheelVisuals.Count)
+        if (_index < 0 || _index >= m_wheels.Count || _index >= m_wheelVisuals.Count)
         {
             return float.PositiveInfinity;
         }
 
-        if (m_Wheels[index] == null || m_WheelVisuals[index] == null)
+        if (m_wheels[_index] == null || m_wheelVisuals[_index] == null)
         {
             return float.PositiveInfinity;
         }
 
-        m_Wheels[index].GetWorldPose(out Vector3 position, out Quaternion unusedRotation);
-        return Vector3.Distance(position, m_WheelVisuals[index].position);
+        m_wheels[_index].GetWorldPose(out Vector3 position, out Quaternion unusedRotation);
+        return Vector3.Distance(position, m_wheelVisuals[_index].position);
     }
 
     // WheelColliderのサスペンション圧縮率の最小値を返す。0=伸びきり、1=縮みきり。
@@ -702,14 +707,14 @@ public partial class WheelController2026 : MonoBehaviour
         get
         {
             // WheelColliderのリストがnullまたは空の場合は0を返す
-            if (m_Wheels == null || m_Wheels.Count == 0)
+            if (m_wheels == null || m_wheels.Count == 0)
             {
                 return 0f;
             }
 
             // 接地しているWheelColliderのサスペンション圧縮率の最小値を求める
             float minimum = 1f;
-            for (int i = 0; i < m_Wheels.Count; i++)
+            for (int i = 0; i < m_wheels.Count; i++)
             {
                 minimum = Mathf.Min(minimum, GetSuspensionCompression01(i));
             }
@@ -722,34 +727,34 @@ public partial class WheelController2026 : MonoBehaviour
     public Quaternion[] GetVisualRotations()
     {
         // 表示用タイヤのTransformのリストがnullの場合は空の配列を返す
-        if (m_WheelVisuals == null)
+        if (m_wheelVisuals == null)
         {
             return new Quaternion[0];
         }
 
         // 表示用タイヤのTransformの回転を取得する
-        Quaternion[] result = new Quaternion[m_WheelVisuals.Count];
+        Quaternion[] result = new Quaternion[m_wheelVisuals.Count];
         for (int i = 0; i < result.Length; i++)
         {
-            result[i] = m_WheelVisuals[i] != null ? m_WheelVisuals[i].rotation : Quaternion.identity;
+            result[i] = m_wheelVisuals[i] != null ? m_wheelVisuals[i].rotation : Quaternion.identity;
         }
 
         return result;
     }
 
     // 表示用タイヤのTransformの回転が変化したかどうかを判定する
-    public bool HaveVisualRotationsChanged(Quaternion[] initial, float minimumAngle)
+    public bool HaveVisualRotationsChanged(Quaternion[] _initial, float _minimumAngle)
     {
         // 表示用タイヤのTransformのリストがnullまたは初期値の配列と長さが異なる場合はfalseを返す
-        if (initial == null || m_WheelVisuals == null || initial.Length != m_WheelVisuals.Count)
+        if (_initial == null || m_wheelVisuals == null || _initial.Length != m_wheelVisuals.Count)
         {
             return false;
         }
 
         // 表示用タイヤのTransformの回転が初期値からminimumAngle以上変化しているかどうかを判定する
-        for (int i = 0; i < initial.Length; i++)
+        for (int i = 0; i < _initial.Length; i++)
         {
-            if (m_WheelVisuals[i] != null && Quaternion.Angle(initial[i], m_WheelVisuals[i].rotation) >= minimumAngle)
+            if (m_wheelVisuals[i] != null && Quaternion.Angle(_initial[i], m_wheelVisuals[i].rotation) >= _minimumAngle)
             {
                 return true;
             }
@@ -759,15 +764,15 @@ public partial class WheelController2026 : MonoBehaviour
     }
 
     // WheelColliderのサスペンション圧縮率を0～1で返す。0=伸びきり、1=縮みきり。
-    public float GetSuspensionCompression01(int index)
+    public float GetSuspensionCompression01(int _index)
     {
         // WheelColliderが存在しない場合は0を返す
-        if (index < 0 || index >= m_Wheels.Count || m_Wheels[index] == null)
+        if (_index < 0 || _index >= m_wheels.Count || m_wheels[_index] == null)
         {
             return 0f;
         }
 
-        WheelCollider wheel = m_Wheels[index];
+        WheelCollider wheel = m_wheels[_index];
         if (!wheel.isGrounded)
         {
             return 0f;
@@ -777,42 +782,42 @@ public partial class WheelController2026 : MonoBehaviour
     }
 
     // サスペンション上端から現在の車輪中心までの伸び量を圧縮率へ変換する関数
-    static float GetSuspensionCompression(WheelCollider wheel)
+    static float GetSuspensionCompression(WheelCollider _wheel)
     {
-        wheel.GetWorldPose(out Vector3 position, out Quaternion unusedRotation);
-        Vector3 suspensionTop = wheel.transform.TransformPoint(wheel.center);
-        float extensionDistance = Vector3.Dot(suspensionTop - position, wheel.transform.up);
-        float extensionRatio = extensionDistance / Mathf.Max(0.01f, wheel.suspensionDistance);
+        _wheel.GetWorldPose(out Vector3 position, out Quaternion unusedRotation);
+        Vector3 suspensionTop = _wheel.transform.TransformPoint(_wheel.center);
+        float extensionDistance = Vector3.Dot(suspensionTop - position, _wheel.transform.up);
+        float extensionRatio = extensionDistance / Mathf.Max(0.01f, _wheel.suspensionDistance);
         return 1f - Mathf.Clamp01(extensionRatio);
     }
 
     // 表示タイヤのメッシュ外周が接触路面より下へ入らないように表示位置を補正する関数
-    void CorrectVisualGroundClearance(int index, WheelCollider wheel, Transform visual)
+    void CorrectVisualGroundClearance(int _index, WheelCollider _wheel, Transform _visual)
     {
-        if (!wheel.GetGroundHit(out WheelHit hit))
+        if (!_wheel.GetGroundHit(out WheelHit hit))
         {
             return;
         }
 
-        float currentClearance = CalculateVisualBoundsClearance(index, hit);
+        float currentClearance = CalculateVisualBoundsClearance(_index, hit);
         if (!float.IsFinite(currentClearance) || currentClearance >= m_minimumGroundClearance)
         {
             return;
         }
 
-        visual.position += hit.normal * (m_minimumGroundClearance - currentClearance);
+        _visual.position += hit.normal * (m_minimumGroundClearance - currentClearance);
     }
 
     // 表示タイヤ内の全メッシュ境界から路面に最も近い距離を求める関数
-    float CalculateVisualBoundsClearance(int index, WheelHit hit)
+    float CalculateVisualBoundsClearance(int _index, WheelHit _hit)
     {
-        if (index < 0 || index >= m_visualMeshFilters.Length || m_visualMeshFilters[index] == null)
+        if (_index < 0 || _index >= m_visualMeshFilters.Length || m_visualMeshFilters[_index] == null)
         {
             return float.PositiveInfinity;
         }
 
         float minimumClearance = float.PositiveInfinity;
-        MeshFilter[] filters = m_visualMeshFilters[index];
+        MeshFilter[] filters = m_visualMeshFilters[_index];
         for (int i = 0; i < filters.Length; i++)
         {
             MeshFilter filter = filters[i];
@@ -830,7 +835,7 @@ public partial class WheelController2026 : MonoBehaviour
                     {
                         Vector3 corner = bounds.center + Vector3.Scale(bounds.extents, new Vector3(x, y, z));
                         Vector3 worldCorner = filter.transform.TransformPoint(corner);
-                        minimumClearance = Mathf.Min(minimumClearance, Vector3.Dot(worldCorner - hit.point, hit.normal));
+                        minimumClearance = Mathf.Min(minimumClearance, Vector3.Dot(worldCorner - _hit.point, _hit.normal));
                     }
                 }
             }
@@ -847,7 +852,7 @@ public partial class WheelController2026 : MonoBehaviour
             m_vehicleRigidbody = GetComponentInParent<Rigidbody>();
         }
 
-        if (m_vehicleRigidbody == null || m_Wheels == null)
+        if (m_vehicleRigidbody == null || m_wheels == null)
         {
             return 0f;
         }
@@ -855,9 +860,9 @@ public partial class WheelController2026 : MonoBehaviour
         Physics.SyncTransforms();
         float requiredCorrection = 0f;
         Vector3 correctionNormal = transform.up;
-        for (int i = 0; i < m_Wheels.Count; i++)
+        for (int i = 0; i < m_wheels.Count; i++)
         {
-            WheelCollider wheel = m_Wheels[i];
+            WheelCollider wheel = m_wheels[i];
             if (wheel == null || !TryFindGroundBelowWheel(wheel, out RaycastHit hit))
             {
                 continue;
@@ -893,13 +898,13 @@ public partial class WheelController2026 : MonoBehaviour
     }
 
     // WheelColliderの接地情報が未生成の開始フレームでも外部路面を検出する関数
-    bool TryFindGroundBelowWheel(WheelCollider wheel, out RaycastHit groundHit)
+    bool TryFindGroundBelowWheel(WheelCollider _wheel, out RaycastHit _groundHit)
     {
-        groundHit = default;
-        wheel.GetWorldPose(out Vector3 position, out Quaternion unusedRotation);
-        Vector3 wheelUp = wheel.transform.up;
+        _groundHit = default;
+        _wheel.GetWorldPose(out Vector3 position, out Quaternion unusedRotation);
+        Vector3 wheelUp = _wheel.transform.up;
         Vector3 origin = position + wheelUp * m_maximumGroundCorrection;
-        float searchDistance = wheel.radius + wheel.suspensionDistance + m_maximumGroundCorrection * 2f;
+        float searchDistance = _wheel.radius + _wheel.suspensionDistance + m_maximumGroundCorrection * 2f;
         RaycastHit[] hits = Physics.RaycastAll(origin, -wheelUp, searchDistance, Physics.AllLayers, QueryTriggerInteraction.Ignore);
         float nearestDistance = float.PositiveInfinity;
         for (int i = 0; i < hits.Length; i++)
@@ -916,40 +921,40 @@ public partial class WheelController2026 : MonoBehaviour
             }
 
             nearestDistance = hit.distance;
-            groundHit = hit;
+            _groundHit = hit;
         }
 
         return nearestDistance < float.PositiveInfinity;
     }
 
     // 停止後の再発進前に制動と残留トルクを消去する。
-    public void PrepareDriveAway(float speedInGearDirection)
+    public void PrepareDriveAway(float _speedInGearDirection)
     {
         // 駆動トルクと制動トルクをリセットする
         ResetDynamics();
-        if (m_vehicleRigidbody == null || Mathf.Abs(speedInGearDirection) <= 0.01f)
+        if (m_vehicleRigidbody == null || Mathf.Abs(_speedInGearDirection) <= 0.01f)
         {
             return;
         }
 
         float currentForward = Vector3.Dot(m_vehicleRigidbody.linearVelocity, transform.forward);
-        m_vehicleRigidbody.linearVelocity += transform.forward * (speedInGearDirection - currentForward);
+        m_vehicleRigidbody.linearVelocity += transform.forward * (_speedInGearDirection - currentForward);
     }
 
     public void ResetDynamics()
     {
         // WheelColliderの駆動トルクと制動トルクをリセットする
-        for (int i = 0; i < m_Wheels.Count; i++)
+        for (int i = 0; i < m_wheels.Count; i++)
         {
             // WheelColliderがnullの場合はスキップする
-            if (m_Wheels[i] == null)
+            if (m_wheels[i] == null)
             {
                 continue;
             }
 
             // 駆動トルクと制動トルクをリセットする
-            m_Wheels[i].motorTorque = 0f;
-            m_Wheels[i].brakeTorque = 0f;
+            m_wheels[i].motorTorque = 0f;
+            m_wheels[i].brakeTorque = 0f;
             m_absPressure[Mathf.Min(i, m_absPressure.Length - 1)] = 1f;
             m_absActive[Mathf.Min(i, m_absActive.Length - 1)] = false;
         }
@@ -969,21 +974,21 @@ public partial class WheelController2026 : MonoBehaviour
     }
 
     // 制動の滑りを除外し、空転制御に必要な加速側の滑り量を取得する関数
-    static float GetAccelerationSlip(float forwardSlip)
+    static float GetAccelerationSlip(float _forwardSlip)
     {
-        return Mathf.Max(0f, -forwardSlip);
+        return Mathf.Max(0f, -_forwardSlip);
     }
 
     void ApplyWheelColliderSettings()
     {
         // WheelColliderの設定を行う前に、リストがnullでないことを確認する
-        if (m_Wheels == null)
+        if (m_wheels == null)
         {
             return;
         }
 
         // WheelColliderの設定を一括で行う
-        foreach (WheelCollider wheel in m_Wheels)
+        foreach (WheelCollider wheel in m_wheels)
         {
             // WheelColliderがアタッチされていない場合はスキップする。
             if (wheel == null)
@@ -1026,31 +1031,31 @@ public partial class WheelController2026 : MonoBehaviour
     // 4輪の位置に対応する表示用タイヤを車両階層から取得する関数
     void ResolveRenderedWheelTransforms()
     {
-        int count = Mathf.Min(m_Wheels.Count, m_WheelVisuals.Count);
+        int count = Mathf.Min(m_wheels.Count, m_wheelVisuals.Count);
         for (int i = 0; i < count; i++)
         {
-            WheelCollider wheel = m_Wheels[i];
+            WheelCollider wheel = m_wheels[i];
             if (wheel == null)
             {
                 continue;
             }
 
-            if (m_WheelVisuals[i] == null)
+            if (m_wheelVisuals[i] == null)
             {
-                m_WheelVisuals[i] = FindWheelVisual(i);
+                m_wheelVisuals[i] = FindWheelVisual(i);
             }
 
-            Transform visual = m_WheelVisuals[i];
+            Transform visual = m_wheelVisuals[i];
             wheel.GetWorldPose(out Vector3 unusedPosition, out Quaternion wheelRotation);
             m_visualRotationOffsets[i] = visual != null ? Quaternion.Inverse(wheelRotation) * visual.rotation : Quaternion.identity;
             m_visualMeshFilters[i] = visual != null ? visual.GetComponentsInChildren<MeshFilter>(true) : new MeshFilter[0];
         }
     }
 
-    // 車輪番号に対応するGRヤリスの表示用タイヤを名前から取得する関数
-    Transform FindWheelVisual(int index)
+    // 車輪番号に対応する車両の表示用タイヤを名前から取得する関数
+    Transform FindWheelVisual(int _index)
     {
-        string wheelName = index == 0 ? "FR" : index == 1 ? "FL" : index == 2 ? "Tire_Mirror_RR" : "RL";
+        string wheelName = _index == 0 ? "FR" : _index == 1 ? "FL" : _index == 2 ? "Tire_Mirror_RR" : "RL";
         Transform searchRoot = m_vehicleRigidbody != null ? m_vehicleRigidbody.transform : transform.root;
         Transform[] candidates = searchRoot.GetComponentsInChildren<Transform>(true);
         for (int i = 0; i < candidates.Length; i++)
@@ -1069,20 +1074,20 @@ public partial class WheelController2026 : MonoBehaviour
     void ValidateLists()
     {
         // WheelColliderのリストがnullの場合は空のリストを作成する
-        int count = m_Wheels != null ? m_Wheels.Count : 0;
+        int count = m_wheels != null ? m_wheels.Count : 0;
         // 自動登録前に前後左右の設定がインスペクターで完了していたかを保持する変数
-        bool hasFrontConfiguration = m_IsFront != null && m_IsFront.Count == count;
-        bool hasRightConfiguration = m_IsRight != null && m_IsRight.Count == count;
+        bool hasFrontConfiguration = m_isFront != null && m_isFront.Count == count;
+        bool hasRightConfiguration = m_isRight != null && m_isRight.Count == count;
         // 駆動・前輪・右輪のブールリストの長さをWheelColliderのリストの長さに揃える
-        EnsureBoolCount(m_IsDrive, count, true);
-        EnsureBoolCount(m_IsFront, count, false);
-        EnsureBoolCount(m_IsRight, count, false);
+        EnsureBoolCount(m_isDrive, count, true);
+        EnsureBoolCount(m_isFront, count, false);
+        EnsureBoolCount(m_isRight, count, false);
         // 4輪を自動登録した場合は前右、前左、後右、後左の順から前後左右を設定する
         if (!hasFrontConfiguration)
         {
             for (int index = 0; index < count; index++)
             {
-                m_IsFront[index] = index < 2;
+                m_isFront[index] = index < 2;
             }
         }
 
@@ -1090,48 +1095,48 @@ public partial class WheelController2026 : MonoBehaviour
         {
             for (int index = 0; index < count; index++)
             {
-                m_IsRight[index] = index == 0 || index == 2;
+                m_isRight[index] = index == 0 || index == 2;
             }
         }
 
-        if (m_WheelVisuals == null)
+        if (m_wheelVisuals == null)
         {
-            m_WheelVisuals = new List<Transform>();
+            m_wheelVisuals = new List<Transform>();
         }
 
-        while (m_WheelVisuals.Count < count)
+        while (m_wheelVisuals.Count < count)
         {
-            m_WheelVisuals.Add(null);
+            m_wheelVisuals.Add(null);
         }
 
-        while (m_WheelVisuals.Count > count)
+        while (m_wheelVisuals.Count > count)
         {
-            m_WheelVisuals.RemoveAt(m_WheelVisuals.Count - 1);
+            m_wheelVisuals.RemoveAt(m_wheelVisuals.Count - 1);
         }
     }
 
     // ブールリストの長さを指定した数に揃える
-    static void EnsureBoolCount(List<bool> list, int count, bool defaultValue)
+    static void EnsureBoolCount(List<bool> _list, int _count, bool _defaultValue)
     {
-        if (list == null)
+        if (_list == null)
         {
             return;
         }
 
-        while (list.Count < count)
+        while (_list.Count < _count)
         {
-            list.Add(defaultValue);
+            _list.Add(_defaultValue);
         }
 
-        while (list.Count > count)
+        while (_list.Count > _count)
         {
-            list.RemoveAt(list.Count - 1);
+            _list.RemoveAt(_list.Count - 1);
         }
     }
 
     // WheelColliderのリストとコンポーネントが揃っているかどうかを返す
     bool Ready()
     {
-        return m_Wheels != null && m_Wheels.Count > 0 && m_differential != null && m_brake != null && m_steering != null;
+        return m_wheels != null && m_wheels.Count > 0 && m_differential != null && m_brake != null && m_steering != null;
     }
 }

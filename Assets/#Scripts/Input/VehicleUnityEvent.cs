@@ -24,14 +24,14 @@ public class VehicleUnityEvent : MonoBehaviour
     }
 
     // クラッチ機器が使えなくなった時に踏み込み済みの判定を消す関数
-    private void OnClutchDeviceChanged(InputDevice device, InputDeviceChange change)
+    private void OnClutchDeviceChanged(InputDevice _device, InputDeviceChange _change)
     {
-        if (device != m_clutchInputDevice)
+        if (_device != m_clutchInputDevice)
         {
             return;
         }
 
-        if (change != InputDeviceChange.Removed && change != InputDeviceChange.Disconnected && change != InputDeviceChange.Disabled)
+        if (_change != InputDeviceChange.Removed && _change != InputDeviceChange.Disconnected && _change != InputDeviceChange.Disabled)
         {
             return;
         }
@@ -47,8 +47,9 @@ public class VehicleUnityEvent : MonoBehaviour
     }
 
     private Transmission m_transmission;
+    [UnityEngine.Serialization.FormerlySerializedAs("Chair")]
     [SerializeField]
-    private ChairController2024 Chair;
+    private ChairController2024 m_chair;
     [Header("Input Adjust")]
     [SerializeField, Range(1.0f, 4.0f)]
     private float m_accelInputPower = 2.0f;
@@ -143,17 +144,17 @@ public class VehicleUnityEvent : MonoBehaviour
     }
 
     // G923系の反転ペダル値を0から1へ変換する関数
-    private float ConvertG923PedalValue(float rawValue)
+    private float ConvertG923PedalValue(float _rawValue)
     {
-        float value = 1.0f - (rawValue + 1.0f) * 0.5f;
+        float value = 1.0f - (_rawValue + 1.0f) * 0.5f;
         return Mathf.Clamp01(value);
     }
 
     // アクセルとブレーキを変えずクラッチだけ機器の入力方向へ合わせる関数
-    private float ConvertClutchPedalValue(float rawValue)
+    private float ConvertClutchPedalValue(float _rawValue)
     {
         // 共通のペダル変換を変えると他のペダルまで反転するため専用の補正を行う
-        float pedal = ConvertG923PedalValue(rawValue);
+        float pedal = ConvertG923PedalValue(_rawValue);
         return m_invertClutchPedal ? 1f - pedal : pedal;
     }
 
@@ -183,14 +184,14 @@ public class VehicleUnityEvent : MonoBehaviour
     }
 
     // シーンに登録された矢印キーとゲームパッドの操舵入力を既存の車両入力処理へ渡す関数
-    public void OnHandleKeyboard(InputAction.CallbackContext context)
+    public void OnHandleKeyboard(InputAction.CallbackContext _context)
     {
         // 既存の入力補正とキーを離した時の中央復帰を共用して入力経路の違いによる操舵差を防ぐ
-        OnHandle(context);
+        OnHandle(_context);
     }
 
     // 入力機器の操舵値を車両へ渡す関数
-    public void OnHandle(InputAction.CallbackContext context)
+    public void OnHandle(InputAction.CallbackContext _context)
     {
         if (m_vehicleController == null)
         {
@@ -203,9 +204,9 @@ public class VehicleUnityEvent : MonoBehaviour
         }
 
         // Valueアクションが解除された時は残留操舵を確実に中央へ戻す
-        float rawValue = context.canceled ? 0.0f : context.ReadValue<float>();
+        float rawValue = _context.canceled ? 0.0f : _context.ReadValue<float>();
         float value = Mathf.Abs(rawValue) < m_steeringDeadZone ? 0.0f : Mathf.Clamp(rawValue, -1.0f, 1.0f);
-        bool isKeyboard = context.control != null && context.control.device is Keyboard;
+        bool isKeyboard = _context.control != null && _context.control.device is Keyboard;
         m_vehicleController.SetSteeringInput(value, isKeyboard);
     }
 
@@ -234,7 +235,7 @@ public class VehicleUnityEvent : MonoBehaviour
     }
 
     // キーボードとゲームパッドのアクセル入力を車両へ渡す関数
-    public void OnAccel(InputAction.CallbackContext context)
+    public void OnAccel(InputAction.CallbackContext _context)
     {
         if (m_vehicleController == null)
         {
@@ -246,13 +247,13 @@ public class VehicleUnityEvent : MonoBehaviour
             return;
         }
 
-        if (context.canceled)
+        if (_context.canceled)
         {
             m_vehicleController.Accel = 0.0f;
             return;
         }
 
-        float value = context.ReadValue<float>();
+        float value = _context.ReadValue<float>();
         value = Mathf.Clamp01(value);
         if (value < m_accelDeadZone)
         {
@@ -264,7 +265,7 @@ public class VehicleUnityEvent : MonoBehaviour
     }
 
     // G923のアクセルペダル入力を車両へ渡す関数
-    public void OnAccelPedal(InputAction.CallbackContext context)
+    public void OnAccelPedal(InputAction.CallbackContext _context)
     {
         if (m_vehicleController == null)
         {
@@ -276,13 +277,13 @@ public class VehicleUnityEvent : MonoBehaviour
             return;
         }
 
-        if (context.canceled)
+        if (_context.canceled)
         {
             m_vehicleController.Accel = 0.0f;
             return;
         }
 
-        float rawValue = context.ReadValue<float>();
+        float rawValue = _context.ReadValue<float>();
         float value = ConvertG923PedalValue(rawValue);
         if (value < m_accelDeadZone)
         {
@@ -294,7 +295,7 @@ public class VehicleUnityEvent : MonoBehaviour
     }
 
     // キーボードとゲームパッドのブレーキ入力を車両へ渡す関数
-    public void OnBrake(InputAction.CallbackContext context)
+    public void OnBrake(InputAction.CallbackContext _context)
     {
         if (m_vehicleController == null)
         {
@@ -306,13 +307,13 @@ public class VehicleUnityEvent : MonoBehaviour
             return;
         }
 
-        if (context.canceled)
+        if (_context.canceled)
         {
             m_vehicleController.Brake = 0.0f;
             return;
         }
 
-        float value = context.ReadValue<float>();
+        float value = _context.ReadValue<float>();
         value = Mathf.Clamp01(value);
         if (value < m_brakeDeadZone)
         {
@@ -324,7 +325,7 @@ public class VehicleUnityEvent : MonoBehaviour
     }
 
     // G923のブレーキペダル入力を車両へ渡す関数
-    public void OnBrakePedal(InputAction.CallbackContext context)
+    public void OnBrakePedal(InputAction.CallbackContext _context)
     {
         if (m_vehicleController == null)
         {
@@ -336,13 +337,13 @@ public class VehicleUnityEvent : MonoBehaviour
             return;
         }
 
-        if (context.canceled)
+        if (_context.canceled)
         {
             m_vehicleController.Brake = 0.0f;
             return;
         }
 
-        float rawValue = context.ReadValue<float>();
+        float rawValue = _context.ReadValue<float>();
         float value = ConvertG923PedalValue(rawValue);
         if (value < m_brakeDeadZone)
         {
@@ -354,12 +355,12 @@ public class VehicleUnityEvent : MonoBehaviour
     }
 
     // G923のクラッチペダル入力を車両へ渡す関数
-    public void OnClutch(InputAction.CallbackContext context)
+    public void OnClutch(InputAction.CallbackContext _context)
     {
         // 実クラッチを最後に送った機器の切断を監視する
-        m_clutchInputDevice = context.control?.device;
-        m_clutchAxis = context.control as UnityEngine.InputSystem.Controls.AxisControl;
-        m_clutchAction = context.action;
+        m_clutchInputDevice = _context.control?.device;
+        m_clutchAxis = _context.control as UnityEngine.InputSystem.Controls.AxisControl;
+        m_clutchAction = _context.action;
         if (m_vehicleController == null)
         {
             ResolveVehicleReferences();
@@ -377,10 +378,10 @@ public class VehicleUnityEvent : MonoBehaviour
             return;
         }
 
-        if (context.canceled)
+        if (_context.canceled)
         {
             // G923の軸中央でもCanceledが出るため実軸値を読み半踏みを未操作にしない
-            if (m_vehicleController.TrackLeverClutchRequired && context.control is UnityEngine.InputSystem.Controls.AxisControl clutchAxis)
+            if (m_vehicleController.TrackLeverClutchRequired && _context.control is UnityEngine.InputSystem.Controls.AxisControl clutchAxis)
             {
                 m_vehicleController.SetPhysicalClutchPedal(ConvertClutchPedalValue(clutchAxis.ReadValue()));
             }
@@ -392,14 +393,14 @@ public class VehicleUnityEvent : MonoBehaviour
             return;
         }
 
-        float rawValue = context.ReadValue<float>();
+        float rawValue = _context.ReadValue<float>();
         float value = ConvertClutchPedalValue(rawValue);
         // 踏み込み量を接続率と混同せずTrackレバーの変速判定へ渡す
         m_vehicleController.SetPhysicalClutchPedal(value);
     }
 
     // シフトアップ操作をトランスミッションへ渡す関数
-    public void OnShiftUp(InputAction.CallbackContext context)
+    public void OnShiftUp(InputAction.CallbackContext _context)
     {
         if (m_transmission == null)
         {
@@ -411,8 +412,8 @@ public class VehicleUnityEvent : MonoBehaviour
             return;
         }
 
-        bool isLogitechPaddle = IsLogitechPaddle(context, "button5");
-        if (context.canceled)
+        bool isLogitechPaddle = IsLogitechPaddle(_context, "button5");
+        if (_context.canceled)
         {
             if (isLogitechPaddle)
             {
@@ -428,7 +429,7 @@ public class VehicleUnityEvent : MonoBehaviour
         }
 
         // Press設定の押下確定で一度だけ変速しStarted通知の有無に依存させない
-        if (!context.performed)
+        if (!_context.performed)
         {
             return;
         }
@@ -436,7 +437,7 @@ public class VehicleUnityEvent : MonoBehaviour
         // ATはクラッチ操作を要求せず停止中だけ走行方向を選択する
         if (m_transmission.Type == Transmission.TransmissionType.Automatic)
         {
-            if (IsExternalLever(context))
+            if (IsExternalLever(_context))
             {
                 m_vehicleController.RequestLeverShift(true);
             }
@@ -456,7 +457,7 @@ public class VehicleUnityEvent : MonoBehaviour
         }
 
         // LTBだけ実クラッチ判定へ送りパドルとキーボードの従来操作を維持する
-        if (IsExternalLever(context))
+        if (IsExternalLever(_context))
         {
             m_vehicleController.RequestLeverShift(true);
         }
@@ -468,7 +469,7 @@ public class VehicleUnityEvent : MonoBehaviour
     }
 
     // シフトダウン操作をトランスミッションへ渡す関数
-    public void OnShiftDown(InputAction.CallbackContext context)
+    public void OnShiftDown(InputAction.CallbackContext _context)
     {
         if (m_transmission == null)
         {
@@ -480,8 +481,8 @@ public class VehicleUnityEvent : MonoBehaviour
             return;
         }
 
-        bool isLogitechPaddle = IsLogitechPaddle(context, "button6");
-        if (context.canceled)
+        bool isLogitechPaddle = IsLogitechPaddle(_context, "button6");
+        if (_context.canceled)
         {
             if (isLogitechPaddle)
             {
@@ -497,7 +498,7 @@ public class VehicleUnityEvent : MonoBehaviour
         }
 
         // 押下確定だけを使い開始通知との二重変速を防ぐ
-        if (!context.performed)
+        if (!_context.performed)
         {
             return;
         }
@@ -505,7 +506,7 @@ public class VehicleUnityEvent : MonoBehaviour
         // 走行中の要求ではATを維持し停止中だけ1速からNからRへ選択する
         if (m_transmission.Type == Transmission.TransmissionType.Automatic)
         {
-            if (IsExternalLever(context))
+            if (IsExternalLever(_context))
             {
                 m_vehicleController.RequestLeverShift(false);
             }
@@ -525,7 +526,7 @@ public class VehicleUnityEvent : MonoBehaviour
         }
 
         // LTBのダウン操作もアップと同じクラッチ判定を必ず通す
-        if (IsExternalLever(context))
+        if (IsExternalLever(_context))
         {
             m_vehicleController.RequestLeverShift(false);
         }
@@ -537,19 +538,19 @@ public class VehicleUnityEvent : MonoBehaviour
     }
 
     // G923とG29のパドル入力だけを判定する関数
-    private bool IsLogitechPaddle(InputAction.CallbackContext context, string buttonName)
+    private bool IsLogitechPaddle(InputAction.CallbackContext _context, string _buttonName)
     {
-        string controlPath = context.control?.path ?? string.Empty;
-        string deviceName = context.control?.device?.displayName ?? string.Empty;
+        string controlPath = _context.control?.path ?? string.Empty;
+        string deviceName = _context.control?.device?.displayName ?? string.Empty;
         bool isLogitechWheel = deviceName.Contains("G923") || deviceName.Contains("G29");
-        return isLogitechWheel && controlPath.EndsWith("/" + buttonName);
+        return isLogitechWheel && controlPath.EndsWith("/" + _buttonName);
     }
 
     // 既存のLTB-SMG入力定義と機器情報から外付けレバーだけを判定する関数
-    private bool IsExternalLever(InputAction.CallbackContext context)
+    private bool IsExternalLever(InputAction.CallbackContext _context)
     {
         // 製品名とレイアウト名のどちらで接続されてもレバーを識別する情報
-        var device = context.control?.device;
+        var device = _context.control?.device;
         if (device == null)
         {
             return false;
@@ -560,7 +561,7 @@ public class VehicleUnityEvent : MonoBehaviour
     }
 
     // ホーン操作を車両へ渡す関数
-    public void OnHorn(InputAction.CallbackContext context)
+    public void OnHorn(InputAction.CallbackContext _context)
     {
         if (m_vehicleController == null)
         {
@@ -572,13 +573,13 @@ public class VehicleUnityEvent : MonoBehaviour
             return;
         }
 
-        if (context.canceled)
+        if (_context.canceled)
         {
             m_vehicleController.IsHorn = 0.0f;
             return;
         }
 
-        float value = context.ReadValue<float>();
+        float value = _context.ReadValue<float>();
         m_vehicleController.IsHorn = value;
     }
 }

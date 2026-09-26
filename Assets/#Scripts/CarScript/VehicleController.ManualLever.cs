@@ -23,23 +23,23 @@ public partial class VehicleController
     // 直近の変速操作がTrackのレバーだったことを保持する状態
     bool m_manualLeverSelected;
     // 現在のモードでレバーにクラッチを要求するかを返す状態
-    public bool TrackLeverClutchRequired => m_requireTrackLeverClutch && m_mission != null && m_differential != null && m_mission.Type == Transmission.TransmissionType.Manual && m_differential.CurrentMode == Differential.GRFourMode.Track;
+    public bool TrackLeverClutchRequired => m_requireTrackLeverClutch && m_mission != null && m_differential != null && m_mission.Type == Transmission.TransmissionType.Manual && m_differential.CurrentMode == Differential.DriveMode.Track;
     // 自動変速補助と回転合わせを止めて実ペダルを優先する状態
     public bool ManualLeverActive => m_manualLeverSelected && m_manualPedalCouplingSelected && TrackLeverClutchRequired;
     // 実クラッチを踏むほど加速補助も弱め完全切断中の駆動漏れを防ぐ割合
     public float ManualDriveAssistRatio => ManualLeverActive ? Mathf.Clamp01(m_clutch.Engagement) : 1f;
 
     // 入力側が変換した実クラッチ踏み込み量を受け取る関数
-    public void SetPhysicalClutchPedal(float pedal)
+    public void SetPhysicalClutchPedal(float _pedal)
     {
         // 不正値を接続率へ流すとトルクまで壊れるため入力未受信として切断する
-        if (float.IsNaN(pedal) || float.IsInfinity(pedal))
+        if (float.IsNaN(_pedal) || float.IsInfinity(_pedal))
         {
             ClearPhysicalClutchPedal();
             return;
         }
 
-        m_physicalClutchPedal = Mathf.Clamp01(pedal);
+        m_physicalClutchPedal = Mathf.Clamp01(_pedal);
         m_clutchPedalReceived = true;
         // 最初の変速前でもペダルを踏んだ時点で駆動を切れるよう実クラッチへ切り替える
         if (TrackLeverClutchRequired && m_physicalClutchPedal > m_leverClutchReleasedThreshold)
@@ -63,7 +63,7 @@ public partial class VehicleController
     }
 
     // LTBの押下時だけクラッチと既存の過回転保護を通して一段変速する関数
-    public bool RequestLeverShift(bool up)
+    public bool RequestLeverShift(bool _up)
     {
         if (m_mission == null || m_clutch == null)
         {
@@ -73,7 +73,7 @@ public partial class VehicleController
         // ATではクラッチ付きMTへ切り替えず停止中の走行方向だけを選択する
         if (m_mission.Type == Transmission.TransmissionType.Automatic)
         {
-            return RequestAutomaticDirection(up);
+            return RequestAutomaticDirection(_up);
         }
 
         if (TrackLeverClutchRequired)
@@ -97,7 +97,7 @@ public partial class VehicleController
 
         // 変速ロックや過回転で拒否された時も成功と表示しないための直前ギア
         int previousGear = m_mission.ActiveGear;
-        if (up)
+        if (_up)
         {
             m_mission.ShiftUp();
         }
@@ -110,7 +110,7 @@ public partial class VehicleController
     }
 
     // パドルは半踏み判定を通さず変速間隔と過回転保護だけで変速する関数
-    public bool RequestPaddleShift(bool up)
+    public bool RequestPaddleShift(bool _up)
     {
         if (m_mission == null || m_clutch == null)
         {
@@ -120,13 +120,13 @@ public partial class VehicleController
         // パドルにもレバーと同じAT停止条件を適用する
         if (m_mission.Type == Transmission.TransmissionType.Automatic)
         {
-            return RequestAutomaticDirection(up);
+            return RequestAutomaticDirection(_up);
         }
 
         // 変速許可とは別に踏み込み中の駆動切断を維持する
         SelectPaddleClutch();
         int previousGear = m_mission.ActiveGear;
-        if (up)
+        if (_up)
         {
             m_mission.ShiftUp();
         }
@@ -139,19 +139,20 @@ public partial class VehicleController
     }
 
     // メーターの更新待ちではなく現在の車体速度でATの方向切替を判定する関数
-    bool RequestAutomaticDirection(bool up)
+    bool RequestAutomaticDirection(bool _up)
     {
-        if (m_rigidbody == null || m_IsPullUp)
+        if (m_rigidbody == null || m_isPullUp)
         {
             return false;
         }
 
-        return m_mission.RequestAutomaticSelector(up, m_rigidbody.linearVelocity.magnitude * 3.6f);
+        return m_mission.RequestAutomaticSelector(_up, m_rigidbody.linearVelocity.magnitude * 3.6f);
     }
 
     // 高回転ダウンシフト時の速度変更を一瞬で行わず短時間で収める秒数
+    [UnityEngine.Serialization.FormerlySerializedAs("m_manualDownshiftSlowdownSeconds")]
     [SerializeField, Range(0.1f, 1f)]
-    float m_manualDownshiftSlowdownSeconds = 0.3f;
+    float m_downshiftSlowdownSeconds = 0.3f;
     // 入力経路に関係なく成立した変速を検出するための前回ギア
     int m_previousSpeedLimitGear;
     // 最初の物理更新をダウンシフトと誤認しないための初期化状態
@@ -172,7 +173,7 @@ public partial class VehicleController
         bool changed = !m_speedLimitGearInitialized || gear != m_previousSpeedLimitGear;
         m_previousSpeedLimitGear = gear;
         m_speedLimitGearInitialized = true;
-        if (m_IsPullUp || m_mission.Type != Transmission.TransmissionType.Manual || gear <= 0)
+        if (m_isPullUp || m_mission.Type != Transmission.TransmissionType.Manual || gear <= 0)
         {
             m_downshiftSlowdownRemaining = 0f;
             return;
@@ -181,7 +182,7 @@ public partial class VehicleController
         // アップシフトやNへの変更で古い段の制限を残さない
         if (changed)
         {
-            m_downshiftSlowdownRemaining = downshift ? m_manualDownshiftSlowdownSeconds : 0f;
+            m_downshiftSlowdownRemaining = downshift ? m_downshiftSlowdownSeconds : 0f;
         }
 
         if (m_downshiftSlowdownRemaining <= 0f)
@@ -211,20 +212,20 @@ public partial class VehicleController
         float blend = Mathf.Clamp01(Time.fixedDeltaTime / Mathf.Max(Time.fixedDeltaTime, m_downshiftSlowdownRemaining));
         float nextSpeed = Mathf.Lerp(speed, target, blend);
         m_rigidbody.linearVelocity = velocity - planar + planar * (nextSpeed / speed);
-        m_KPH = m_rigidbody.linearVelocity.magnitude * 3.6f;
+        m_kph = m_rigidbody.linearVelocity.magnitude * 3.6f;
         m_downshiftSlowdownRemaining = Mathf.Max(0f, m_downshiftSlowdownRemaining - Time.fixedDeltaTime);
     }
 
     // 未操作と踏み切りだけを許可し半踏みの変速を拒否する関数
-    static bool IsLeverClutchPositionAllowed(float pedal, float released, float disengaged)
+    static bool IsLeverClutchPositionAllowed(float _pedal, float _released, float _disengaged)
     {
         // 不正な入力値を踏み切りと誤認して変速しない
-        if (float.IsNaN(pedal) || float.IsInfinity(pedal))
+        if (float.IsNaN(_pedal) || float.IsInfinity(_pedal))
         {
             return false;
         }
 
-        return pedal <= Mathf.Clamp(released, 0f, 0.2f) || pedal >= Mathf.Clamp(disengaged, 0.5f, 1f);
+        return _pedal <= Mathf.Clamp(_released, 0f, 0.2f) || _pedal >= Mathf.Clamp(_disengaged, 0.5f, 1f);
     }
 
     // パドルへ持ち替えた時は従来の自動クラッチへ戻す関数

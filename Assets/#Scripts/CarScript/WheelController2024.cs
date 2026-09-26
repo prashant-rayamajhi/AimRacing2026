@@ -82,17 +82,21 @@ public class WheelController2024 : MonoBehaviour
     [SerializeField, Range(0.1f, 1f)]
     float m_relaxationLength;
     float m_steerAngle;
+    [UnityEngine.Serialization.FormerlySerializedAs("resistanceValue")]
     [SerializeField] // 抵抗値の係数
-    float resistanceValue = 0.015f;
+    float m_resistanceValue = 0.015f;
+    [UnityEngine.Serialization.FormerlySerializedAs("speedAdjustment")]
     [SerializeField]
-    float speedAdjustment = 100.0f; // 速度と係数をそのままの値で返すと値がでかすぎるのでこの変数で調整する
+    float m_speedAdjustment = 100.0f; // 速度と係数をそのままの値で返すと値がでかすぎるのでこの変数で調整する
 #pragma warning disable CS0414 // 低速時の抵抗緩和用に用意されているが、現状の計算式では未使用のInspector値
 
+    [UnityEngine.Serialization.FormerlySerializedAs("slipBoostSpeed")]
     [SerializeField]
-    float slipBoostSpeed = 50.0f; // 10.0fなら10km/h以下で抵抗値を弱くする
+    float m_slipBoostSpeed = 50.0f; // 10.0fなら10km/h以下で抵抗値を弱くする
 #pragma warning restore CS0414
+    [UnityEngine.Serialization.FormerlySerializedAs("SpinCoefficient")]
     [SerializeField]
-    float SpinCoefficient = 1.0f; // ホイールスピンさせる係数
+    float m_spinCoefficient = 1.0f; // ホイールスピンさせる係数
     [Header("Suspension")]
     // サスペンション関連
     [SerializeField]
@@ -109,8 +113,10 @@ public class WheelController2024 : MonoBehaviour
     float m_raysMaxAngle = 180;
     float m_orgRadius;
     // 計算したMagicFormulaタイヤ力保存用
-    public float m_Fx;
-    public float m_Fy;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_Fx")]
+    public float m_fx;
+    [UnityEngine.Serialization.FormerlySerializedAs("m_Fy")]
+    public float m_fy;
 #region プロパティ
     public bool IsGround => m_bOnGround;
     // 前後どちらのホイールか判定用(ブレーキバイアスで使用)
@@ -147,7 +153,7 @@ public class WheelController2024 : MonoBehaviour
     public float SlipRatio => m_slipRatio;
     public float SlipAngle => m_slipAngle;
     public float WheelAngularVelocity => m_angularVelocity;
-    public float WheelRPM => m_angularVelocity * CarPhysics.Rad2RPM;
+    public float WheelRPM => m_angularVelocity * CarPhysics.m_radiansToRpm;
     public MagicFormula LongFrictionCurve => m_longForceCurve;
     public MagicFormula LatFrictionCurve => m_latForceCurve;
 
@@ -358,10 +364,11 @@ public class WheelController2024 : MonoBehaviour
             m_isWheelLocked = false;
         }
 
-        m_wheelRPM = m_angularVelocity * CarPhysics.Rad2RPM;
+        m_wheelRPM = m_angularVelocity * CarPhysics.m_radiansToRpm;
     }
 
-    public float tau = 0.02f; // 調整の必要がある
+    [UnityEngine.Serialization.FormerlySerializedAs("tau")]
+    public float m_tau = 0.02f; // 調整の必要がある
     /// <summary>
     /// Addforceする力を計算
     /// </summary>
@@ -426,37 +433,37 @@ public class WheelController2024 : MonoBehaviour
     void CalcCombineForce(out float _outlongF, out float _outLatF)
     {
         // 各スリップのピーク値を取得
-        float slipRatio_peak = m_longForceCurve.PeakSlipRatio;
-        float slipAngle_peak = m_latForceCurve.PeakSlipAngle;
+        float slipRatioPeak = m_longForceCurve.PeakSlipRatio;
+        float slipAnglePeak = m_latForceCurve.PeakSlipAngle;
         // 正規化
-        float slipRatio_normalized = m_slipRatio / slipRatio_peak;
-        float slipAngle_normalized = m_slipAngle / slipAngle_peak;
+        float slipRatioNormalized = m_slipRatio / slipRatioPeak;
+        float slipAngleNormalized = m_slipAngle / slipAnglePeak;
         // 三平方の定理です
-        float combineSlip = Mathf.Sqrt(Mathf.Pow(slipRatio_normalized, 2f) + Mathf.Pow(slipAngle_normalized, 2f));
+        float combineSlip = Mathf.Sqrt(Mathf.Pow(slipRatioNormalized, 2f) + Mathf.Pow(slipAngleNormalized, 2f));
         // 0除算回避
         if (float.Epsilon > combineSlip)
             combineSlip = float.Epsilon;
         // 修正されたスリップ率とスリップ角
-        float fixSlipRatio = combineSlip * slipRatio_peak;
-        float fixSlipAngle = combineSlip * slipAngle_peak;
-        _outlongF = m_longForceCurve.Evaluate(fixSlipRatio) * (slipRatio_normalized / combineSlip);
-        _outLatF = m_latForceCurve.Evaluate(fixSlipAngle) * (slipAngle_normalized / combineSlip);
-        m_Fx = _outlongF;
-        m_Fy = _outLatF;
+        float fixSlipRatio = combineSlip * slipRatioPeak;
+        float fixSlipAngle = combineSlip * slipAnglePeak;
+        _outlongF = m_longForceCurve.Evaluate(fixSlipRatio) * (slipRatioNormalized / combineSlip);
+        _outLatF = m_latForceCurve.Evaluate(fixSlipAngle) * (slipAngleNormalized / combineSlip);
+        m_fx = _outlongF;
+        m_fy = _outLatF;
     }
 
-    void CalcFrictionEllipse(ref float Fx, ref float Fy, float muX, float muY, float load)
+    void CalcFrictionEllipse(ref float _fx, ref float _fy, float _muX, float _muY, float _load)
     {
-        float FxMax = muX * load;
-        float FyMax = muY * load;
-        float nx = Fx / FxMax;
-        float ny = Fy / FyMax;
+        float fxMax = _muX * _load;
+        float fyMax = _muY * _load;
+        float nx = _fx / fxMax;
+        float ny = _fy / fyMax;
         float r = nx * nx + ny * ny;
         if (r > 1f)
         {
             float scale = 1f / Mathf.Sqrt(r);
-            Fx *= scale;
-            Fy *= scale;
+            _fx *= scale;
+            _fy *= scale;
         }
     }
 
@@ -464,20 +471,20 @@ public class WheelController2024 : MonoBehaviour
     {
         // https://www.sae.org/publications/technical-papers/content/2023-01-0684/
         // 各スリップのピーク値を取得
-        float slipRatio_peak = m_longForceCurve.PeakSlipRatio;
-        float slipAngle_peak = m_latForceCurve.PeakSlipAngle;
+        float slipRatioPeak = m_longForceCurve.PeakSlipRatio;
+        float slipAnglePeak = m_latForceCurve.PeakSlipAngle;
         // 正規化
-        float slipRatio_norm = m_slipRatio / slipRatio_peak;
-        float slipAngle_norm = m_slipAngle / slipAngle_peak;
+        float slipRatioNorm = m_slipRatio / slipRatioPeak;
+        float slipAngleNorm = m_slipAngle / slipAnglePeak;
         // 複合スリップ
         float combineSlip = Mathf.Sqrt(m_slipRatio * m_slipRatio + m_slipAngle * m_slipAngle);
         // 0除算回避
         if (float.Epsilon > combineSlip)
             combineSlip = float.Epsilon;
         // 正規化複合スリップ
-        float combineSlip_norm = Mathf.Sqrt(slipRatio_norm * slipRatio_norm + slipAngle_norm * slipAngle_norm);
-        _outLongF = m_slipRatio / (slipRatio_peak * combineSlip) * m_longForceCurve.Evaluate(combineSlip_norm * slipRatio_peak);
-        _outLatF = m_slipAngle / (slipAngle_peak * combineSlip) * m_latForceCurve.Evaluate(combineSlip_norm * slipAngle_peak);
+        float combineSlipNorm = Mathf.Sqrt(slipRatioNorm * slipRatioNorm + slipAngleNorm * slipAngleNorm);
+        _outLongF = m_slipRatio / (slipRatioPeak * combineSlip) * m_longForceCurve.Evaluate(combineSlipNorm * slipRatioPeak);
+        _outLatF = m_slipAngle / (slipAnglePeak * combineSlip) * m_latForceCurve.Evaluate(combineSlipNorm * slipAnglePeak);
     }
 
 #region RaycastExpansion
@@ -527,24 +534,24 @@ public class WheelController2024 : MonoBehaviour
     /// <summary>
     /// ホイールの形のGizmoを描画
     /// </summary>
-    void DrawWheelGizmo(float radius, float width, Vector3 position, Vector3 up, Vector3 forward, Vector3 right)
+    void DrawWheelGizmo(float _radius, float _width, Vector3 _position, Vector3 _up, Vector3 _forward, Vector3 _right)
     {
         Gizmos.color = Color.green;
-        var halfWidth = width / 2.0f;
+        var halfWidth = _width / 2.0f;
         float theta = 0.0f;
-        float x = radius * Mathf.Cos(theta);
-        float y = radius * Mathf.Sin(theta);
-        Vector3 pos = position + up * y + forward * x;
+        float x = _radius * Mathf.Cos(theta);
+        float y = _radius * Mathf.Sin(theta);
+        Vector3 pos = _position + _up * y + _forward * x;
         Vector3 newPos;
         for (theta = 0.0f; theta <= Mathf.PI * 2; theta += Mathf.PI / 12.0f)
         {
-            x = radius * Mathf.Cos(theta);
-            y = radius * Mathf.Sin(theta);
-            newPos = position + up * y + forward * x;
-            Gizmos.DrawLine(pos - right * halfWidth, newPos - right * halfWidth);
-            Gizmos.DrawLine(pos + right * halfWidth, newPos + right * halfWidth);
-            Gizmos.DrawLine(pos - right * halfWidth, pos + right * halfWidth);
-            Gizmos.DrawLine(pos - right * halfWidth, newPos + right * halfWidth);
+            x = _radius * Mathf.Cos(theta);
+            y = _radius * Mathf.Sin(theta);
+            newPos = _position + _up * y + _forward * x;
+            Gizmos.DrawLine(pos - _right * halfWidth, newPos - _right * halfWidth);
+            Gizmos.DrawLine(pos + _right * halfWidth, newPos + _right * halfWidth);
+            Gizmos.DrawLine(pos - _right * halfWidth, pos + _right * halfWidth);
+            Gizmos.DrawLine(pos - _right * halfWidth, newPos + _right * halfWidth);
             pos = newPos;
         }
     }
@@ -565,23 +572,24 @@ public class WheelController2024 : MonoBehaviour
     /// <summary>
     /// 加減速時の前後荷重配分の計算
     /// </summary>
-    private Vector3 prevForwardVelocity;
+    private Vector3 m_prevForwardVelocity;
+    [UnityEngine.Serialization.FormerlySerializedAs("weightBalance")]
     [Header("LoadBalance front:0 ~ rear:1.0")]
     [SerializeField, Range(0.0f, 1.0f)]
-    private float weightBalance;
+    private float m_weightBalance;
     float CalcAcceleAndDeceleLoad(bool _isFront)
     {
-        Vector3 m_velocity = m_vehicleRigidbody.linearVelocity;
+        Vector3 velocity = m_vehicleRigidbody.linearVelocity;
         Vector3 forward = gameObject.transform.forward;
-        Vector3 forwardVelocity = Vector3.Dot(m_velocity, forward) * forward;
+        Vector3 forwardVelocity = Vector3.Dot(velocity, forward) * forward;
         float w = 1190.0f;
         float l = 2.51f;
-        float lf = l * (1.0f - weightBalance);
-        float lr = l * weightBalance;
+        float lf = l * (1.0f - m_weightBalance);
+        float lr = l * m_weightBalance;
         float h = 0.3343f;
-        float a = forwardVelocity.magnitude - prevForwardVelocity.magnitude;
+        float a = forwardVelocity.magnitude - m_prevForwardVelocity.magnitude;
         float g = 9.80665f;
-        prevForwardVelocity = forwardVelocity;
+        m_prevForwardVelocity = forwardVelocity;
         float wf = (w * (lr / l)) - (h / l) * (w / g) * a * 100.0f;
         float wr = (w * (lf / l)) + (h / l) * (w / g) * a * 100.0f;
         return _isFront ? wf : wr;
@@ -594,7 +602,7 @@ public class WheelController2024 : MonoBehaviour
     {
         float tireRadius = m_radius; // タイヤ直径
         float mu = 0.9f;
-        float Fz = m_vehicleRigidbody.mass * 9.81f / 4.0f; // タイヤ一個あたりの質量
+        float fz = m_vehicleRigidbody.mass * 9.81f / 4.0f; // タイヤ一個あたりの質量
         float vWheel = m_wheelRPM * m_radius; // タイヤ外周速度 [m/s](単位不明)
         float vCar = m_vehicleController.KPH / 3600.0f; // 車体前進速度 [m/s](時速から秒速に変換)
         // スリップ率（発進時に特に重要）
@@ -603,18 +611,18 @@ public class WheelController2024 : MonoBehaviour
         if (slipRatio > 0.001f)
         {
             float scale = Mathf.Clamp01(1f - (slipRatio - 0.15f) * 10f);
-            m_Fx = scale;
+            m_fx = scale;
         }
 
         // 1.駆動力の理想値
         float idealForce = _driveTorque / tireRadius;
         // 2.摩擦限界
-        float Fmax = mu * Fz;
+        float fmax = mu * fz;
         // 3.実際に伝わる力
-        float Fx = m_Fx;
+        float fx = m_fx;
         // 駆動力制限
-        float Fx_max = mu * Fz;
-        Fx = Mathf.Clamp(Fx, -Fx_max, Fx_max);
+        float fxMax = mu * fz;
+        fx = Mathf.Clamp(fx, -fxMax, fxMax);
         // ホイールスピン判定
         bool isFullThrottle = false;
         // フルスロットル状態ならフラグを立てる
@@ -625,30 +633,30 @@ public class WheelController2024 : MonoBehaviour
 
         // エンジン回転数の処理
         bool isWheelSpin = (m_vehicleController.ActiveGear == 1) && isFullThrottle && slipRatio > 0.15f;
-        if (Mathf.Abs(idealForce) > Fmax)
+        if (Mathf.Abs(idealForce) > fmax)
         {
             // 限界値に張り付くため、車は加速できない
-            Fx = Mathf.Sign(idealForce) * Fmax * SpinCoefficient;
+            fx = Mathf.Sign(idealForce) * fmax * m_spinCoefficient;
             // 余ったトルクでホイール回転数だけが増える
-            float slipTorque = _driveTorque - Fx * tireRadius;
+            float slipTorque = _driveTorque - fx * tireRadius;
             m_angularVelocity += (slipTorque / Inertia) * Time.fixedDeltaTime;
         }
         else
         {
-            Fx = idealForce;
+            fx = idealForce;
         }
 
         // 4. ブレーキ力を追加
         if (_brakeTorque > 0f)
         {
-            float brakeForce = Mathf.Min(_brakeTorque / tireRadius, Fmax);
-            Fx -= Mathf.Sign(WheelAngularVelocity) * brakeForce;
+            float brakeForce = Mathf.Min(_brakeTorque / tireRadius, fmax);
+            fx -= Mathf.Sign(WheelAngularVelocity) * brakeForce;
             // ホイール回転も減速
             m_angularVelocity -= (_brakeTorque / Inertia) * Time.fixedDeltaTime;
         }
 
         // 5.車体に力を加える
-        m_vehicleRigidbody.AddForceAtPosition(transform.forward * Fx, transform.position);
+        m_vehicleRigidbody.AddForceAtPosition(transform.forward * fx, transform.position);
     }
 
     // 08/31 追加
@@ -659,13 +667,14 @@ public class WheelController2024 : MonoBehaviour
     private float GetResistanceValue()
     {
         // InspectorでresistanceValueの値を調整できるように変数に代入
-        float afterResistVal = resistanceValue;
+        float afterResistVal = m_resistanceValue;
         // 指定速度以下は抵抗値を弱くする
-        return afterResistVal = resistanceValue * (m_vehicleController.KPH / speedAdjustment) + 0.015f;
+        return afterResistVal = m_resistanceValue * (m_vehicleController.KPH / m_speedAdjustment) + 0.015f;
     }
 
     // 09/15 追加
-    public float stabilityFactor = 2.0f; // 調整用（大きいほど強制的に前を向く）
+    [UnityEngine.Serialization.FormerlySerializedAs("stabilityFactor")]
+    public float m_stabilityFactor = 2.0f; // 調整用（大きいほど強制的に前を向く）
     /// <summary>
     /// スピンと逆方向に力を加えて急回転を防ぐ関数
     /// </summary>
@@ -683,16 +692,16 @@ public class WheelController2024 : MonoBehaviour
         // 車体前方と進行方向の角度差（横滑り角っぽい値）
         float angle = Vector3.SignedAngle(forward, velDir, Vector3.up);
         // 角度差に比例して復元トルクを加える
-        float restoringTorque = -angle * stabilityFactor;
+        float restoringTorque = -angle * m_stabilityFactor;
         m_vehicleRigidbody.AddTorque(Vector3.up * restoringTorque, ForceMode.Acceleration);
     }
 
-    float CalcLoadSensitiveMu(float load)
+    float CalcLoadSensitiveMu(float _load)
     {
         // 0除算・異常値対策
-        if (load < 1f)
-            load = 1f;
+        if (_load < 1f)
+            _load = 1f;
         // μ(Fz) = μ0 * (Fz / Fz0)^n
-        return m_baseMu * Mathf.Pow(load / m_refLoad, m_loadSensitivity);
+        return m_baseMu * Mathf.Pow(_load / m_refLoad, m_loadSensitivity);
     }
 }
